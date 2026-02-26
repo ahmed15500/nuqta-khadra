@@ -3,10 +3,11 @@ import { useAuth } from "../contexts/AuthContext";
 
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { loading, session, profile, authError, syncAuthState } = useAuth();
+  const shouldBlockAuthError = Boolean(authError && (!session || !profile));
 
   if (loading) return <p className="center">جاري التحميل...</p>;
 
-  if (authError) {
+  if (shouldBlockAuthError) {
     return (
       <div className="center">
         <p className="error">تعذر تحميل بيانات الحساب</p>

@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { registerSW } from "virtual:pwa-register";
 import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
+import { initCapgoLiveUpdates } from "./lib/capgoUpdater";
 import "./index.css";
 
 if (import.meta.env.PROD) {
@@ -14,6 +15,12 @@ if (import.meta.env.PROD) {
     regs.forEach((reg) => reg.unregister());
   });
 }
+
+initCapgoLiveUpdates({
+  enabled: import.meta.env.VITE_CAPGO_LIVE_UPDATES === "1",
+  repo: import.meta.env.VITE_GITHUB_REPO || "ahmed15500/nuqta-khadra",
+  currentVersion: import.meta.env.VITE_APP_VERSION || "0.0.0"
+});
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

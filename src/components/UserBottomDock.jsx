@@ -1,6 +1,7 @@
 import {
   CircleDollarSign,
   Home,
+  List,
   LogOut,
   PlusCircle,
   Repeat2,
@@ -16,7 +17,9 @@ import { roles } from "../lib/supabase";
 const roleItems = {
   [roles.USER]: [
     { key: "home", to: "/user", label: "الرئيسية", icon: Home, end: true },
-    { key: "transfer", to: "/user/transfer", label: "تحويل", icon: Repeat2 }
+    { key: "transfer", to: "/user/transfer", label: "التحويل", icon: Repeat2 },
+    { key: "tx", to: "/user/transactions", label: "المعاملات", icon: List },
+    { key: "settings", to: "/user/settings", label: "الإعدادات", icon: Settings2 }
   ],
   [roles.COLLECTOR]: [
     { key: "home", to: "/collector", label: "الرئيسية", icon: Home, end: true },

@@ -16,10 +16,11 @@
     "cap:run:android": "cap run android"
   },
   "dependencies": {
-    "@tailwindcss/vite": "^4.1.14",
     "@capacitor/android": "^7.4.3",
     "@capacitor/core": "^7.4.3",
+    "@capgo/capacitor-updater": "^7.43.3",
     "@supabase/supabase-js": "^2.52.1",
+    "@tailwindcss/vite": "^4.1.14",
     "clsx": "^2.1.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",

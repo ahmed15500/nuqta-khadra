@@ -30,6 +30,7 @@ function compareVersions(a, b) {
 
 export default function AppUpdateNotice() {
   const [updateInfo, setUpdateInfo] = useState(null);
+  const liveUpdatesEnabled = import.meta.env.VITE_CAPGO_LIVE_UPDATES === "1";
 
   const repo = import.meta.env.VITE_GITHUB_REPO || FALLBACK_REPO;
   const currentVersion = normalizeVersion(import.meta.env.VITE_APP_VERSION || "0.0.0");
@@ -119,6 +120,7 @@ export default function AppUpdateNotice() {
     setUpdateInfo(null);
   };
 
+  if (liveUpdatesEnabled) return null;
   if (!isNativeApp || !updateInfo) return null;
 
   return (

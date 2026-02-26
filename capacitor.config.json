@@ -2,5 +2,13 @@
   "appId": "com.nuqta.khadra",
   "appName": "Nuqta Khadra",
   "webDir": "dist",
-  "bundledWebRuntime": false
+  "bundledWebRuntime": false,
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "appReadyTimeout": 10000,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true
+    }
+  }
 }

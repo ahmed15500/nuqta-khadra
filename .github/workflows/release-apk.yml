@@ -30,6 +30,15 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+          VITE_APP_VERSION: ${{ github.ref_name }}
+          VITE_CAPGO_LIVE_UPDATES: "1"
+
+      - name: Create dist.zip for live updates
+        run: |
+          mkdir -p release
+          cd dist
+          zip -r ../release/dist.zip .
 
       - name: Capacitor sync android
         run: npx cap sync android
@@ -76,4 +85,6 @@ jobs:
       - name: Create GitHub Release and upload APK
         uses: softprops/action-gh-release@v2
         with:
-          files: release/*.apk
+          files: |
+            release/*.apk
+            release/dist.zip

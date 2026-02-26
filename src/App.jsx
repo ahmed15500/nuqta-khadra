@@ -10,6 +10,8 @@ import CollectorHome from "./pages/collector/CollectorHome";
 import AddWaste from "./pages/collector/AddWaste";
 import UserHome from "./pages/user/UserHome";
 import Transfer from "./pages/user/Transfer";
+import UserTransactions from "./pages/user/UserTransactions";
+import UserSettings from "./pages/user/UserSettings";
 import PartnerHome from "./pages/partner/PartnerHome";
 import AdminHome from "./pages/admin/AdminHome";
 import ManagePrices from "./pages/admin/ManagePrices";
@@ -29,12 +31,13 @@ const roleHome = {
 
 function RootRedirect() {
   const { session, profile, loading, authError, logout, syncAuthState } = useAuth();
+  const shouldBlockAuthError = Boolean(authError && (!session || !profile));
 
   if (loading) {
     return <StateScreen title="جاري تحميل بيانات الحساب" subtitle="انتظر لحظة..." />;
   }
 
-  if (authError) {
+  if (shouldBlockAuthError) {
     return (
       <StateScreen
         title="تعذر تحميل الحساب"
@@ -142,6 +145,22 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[roles.USER]}>
               <Transfer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/transactions"
+          element={
+            <ProtectedRoute allowedRoles={[roles.USER]}>
+              <UserTransactions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/settings"
+          element={
+            <ProtectedRoute allowedRoles={[roles.USER]}>
+              <UserSettings />
             </ProtectedRoute>
           }
         />

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import TransactionList from "../../components/TransactionList";
 import { useAuth } from "../../contexts/AuthContext";
 import { roles, rpcWithArgFallback, supabase } from "../../lib/supabase";
 
@@ -153,7 +152,7 @@ export default function UserHome() {
     };
 
     load();
-  }, [profile?.id, refreshProfile]);
+  }, [profile?.id]);
 
   const todayTransactions = useMemo(() => {
     const today = new Date().toDateString();
@@ -290,8 +289,6 @@ export default function UserHome() {
         ))}
       </div>
 
-      <h2>آخر المعاملات</h2>
-      <TransactionList rows={rows} />
     </section>
   );
 }

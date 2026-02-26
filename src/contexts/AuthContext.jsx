@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, phoneToEmail, supabaseConfigError } from "../lib/supabase";
 
 const AuthContext = createContext(null);
@@ -32,6 +32,16 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState("");
+  const sessionRef = useRef(null);
+  const profileRef = useRef(null);
+
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const fetchProfile = async (userId) => {
     const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
@@ -91,8 +101,11 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    setLoading(true);
-    setAuthError("");
+    const hasUsableState = Boolean(sessionRef.current?.user?.id && profileRef.current?.id);
+    if (!hasUsableState) {
+      setLoading(true);
+      setAuthError("");
+    }
 
     try {
       const { data, error } = await withTimeout(
@@ -117,7 +130,11 @@ export function AuthProvider({ children }) {
     } catch (err) {
       // Do not force-logout on transient profile/network errors.
       // Keep the current session and surface a recoverable error.
-      setAuthError(err?.message || "تعذر تحميل بيانات الحساب من Supabase.");
+      if (hasUsableState) {
+        setAuthError("");
+      } else {
+        setAuthError(err?.message || "تعذر تحميل بيانات الحساب من Supabase.");
+      }
     } finally {
       setLoading(false);
     }
@@ -134,7 +151,12 @@ export function AuthProvider({ children }) {
       setProfile(data);
       setAuthError("");
     } catch (err) {
-      setAuthError(err?.message || "تعذر تحديث بيانات الحساب.");
+      const hasUsableState = Boolean(profileRef.current?.id === session?.user?.id);
+      if (hasUsableState) {
+        setAuthError("");
+      } else {
+        setAuthError(err?.message || "تعذر تحديث بيانات الحساب.");
+      }
     }
   };
 
@@ -164,7 +186,12 @@ export function AuthProvider({ children }) {
               setAuthError("");
             })
             .catch((err) => {
-              setAuthError(err?.message || "تعذر تحديث بيانات الحساب.");
+              const hasUsableState = Boolean(profileRef.current?.id === nextSession.user.id);
+              if (hasUsableState) {
+                setAuthError("");
+              } else {
+                setAuthError(err?.message || "تعذر تحديث بيانات الحساب.");
+              }
             });
         } else {
           setProfile(null);
@@ -173,8 +200,11 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      setLoading(true);
-      setAuthError("");
+      const hasUsableState = Boolean(profileRef.current?.id && profileRef.current.id === nextSession?.user?.id);
+      if (!hasUsableState) {
+        setLoading(true);
+        setAuthError("");
+      }
 
       try {
         setSession(nextSession);
@@ -191,7 +221,11 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         // Keep session as-is, expose retryable error instead of logging out.
-        setAuthError(err?.message || "تعذر تحميل بيانات الحساب من Supabase.");
+        if (hasUsableState) {
+          setAuthError("");
+        } else {
+          setAuthError(err?.message || "تعذر تحميل بيانات الحساب من Supabase.");
+        }
       } finally {
         setLoading(false);
       }
@@ -201,6 +235,42 @@ export function AuthProvider({ children }) {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return undefined;
+
+    const shouldRecover = () =>
+      document.visibilityState === "visible" &&
+      (!sessionRef.current?.user?.id || !profileRef.current?.id || Boolean(authError));
+
+    const handleVisibilityChange = () => {
+      if (shouldRecover()) {
+        syncAuthState();
+      }
+    };
+
+    const handleFocus = () => {
+      if (shouldRecover()) {
+        syncAuthState();
+      }
+    };
+
+    const handleOnline = () => {
+      if (shouldRecover()) {
+        syncAuthState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [authError]);
 
   const login = async ({ phone, password }) => {
     const { error } = await supabase.auth.signInWithPassword({

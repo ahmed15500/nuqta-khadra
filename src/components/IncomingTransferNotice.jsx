@@ -124,7 +124,7 @@ export default function IncomingTransferNotice() {
       timersRef.current.forEach((timerId) => clearTimeout(timerId));
       timersRef.current.clear();
     };
-  }, [profile?.id, refreshProfile]);
+  }, [profile?.id]);
 
   if (!profile?.id || !items.length) return null;
 
