@@ -3,10 +3,12 @@ import { useAuth } from "../contexts/AuthContext";
 import PointsBadge from "./PointsBadge";
 import { roles } from "../lib/supabase";
 
+const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
+
 const roleLinks = {
   [roles.COLLECTOR]: [
     { to: "/collector", label: "الرئيسية" },
-    { to: "/collector/add", label: "اضافة عملية" }
+    { to: "/collector/add", label: "إضافة عملية" }
   ],
   [roles.USER]: [
     { to: "/user", label: "الرئيسية" },
@@ -15,9 +17,9 @@ const roleLinks = {
   [roles.PARTNER]: [{ to: "/partner", label: "الرئيسية" }],
   [roles.ADMIN]: [
     { to: "/admin", label: "لوحة التحكم" },
-    { to: "/admin/prices", label: "ادارة الاسعار" },
-    { to: "/admin/stores", label: "ادارة المحلات" },
-    { to: "/admin/transactions", label: "ادارة المعاملات" }
+    { to: "/admin/prices", label: "إدارة الأسعار" },
+    { to: "/admin/stores", label: "إدارة المحلات" },
+    { to: "/admin/transactions", label: "إدارة المعاملات" }
   ]
 };
 
@@ -25,7 +27,7 @@ const roleLabel = {
   [roles.USER]: "مستخدم",
   [roles.COLLECTOR]: "محل جمع",
   [roles.PARTNER]: "محل شريك",
-  [roles.ADMIN]: "ادمن"
+  [roles.ADMIN]: "مشرف"
 };
 
 export default function Navbar() {
@@ -34,8 +36,11 @@ export default function Navbar() {
   const links = roleLinks[profile?.role] || [];
 
   const onLogout = async () => {
-    await logout();
-    navigate("/login");
+    try {
+      await logout();
+    } finally {
+      navigate("/login", { replace: true });
+    }
   };
 
   return (
@@ -49,6 +54,22 @@ export default function Navbar() {
         ))}
       </nav>
       <div className="nav-actions">
+        <a className="powered-by powered-by-nav" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
+          <img
+            src={rdcLogoUrl}
+            alt="Rural Development Center - Heliopolis University"
+            className="powered-logo"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <span className="powered-copy">
+            <small>Powered by</small>
+            <strong>RDC - HU</strong>
+          </span>
+        </a>
+
         <div className="account-mini">
           <strong>{profile?.store_name || profile?.name || "بدون اسم"}</strong>
           <small>{roleLabel[profile?.role] || "-"}</small>

@@ -1,6 +1,62 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { roles, supabase } from "../../lib/supabase";
+
+async function loadPartnersWithOptionalPhoto() {
+  const withPhoto = await supabase
+    .from("profiles")
+    .select("id, name, store_name, phone, role, disabled, photo_url")
+    .eq("role", roles.PARTNER)
+    .eq("disabled", false)
+    .order("store_name", { ascending: true });
+
+  if (!withPhoto.error) return withPhoto.data || [];
+
+  const maybeMissingColumn = String(withPhoto.error?.message || "")
+    .toLowerCase()
+    .includes("photo_url");
+  if (!maybeMissingColumn) return [];
+
+  const fallback = await supabase
+    .from("profiles")
+    .select("id, name, store_name, phone, role, disabled")
+    .eq("role", roles.PARTNER)
+    .eq("disabled", false)
+    .order("store_name", { ascending: true });
+
+  return (fallback.data || []).map((p) => ({ ...p, photo_url: "" }));
+}
+
+const normalizeArabicDigits = (value) =>
+  String(value || "").replace(/[\u0660-\u0669]/g, (d) => String("\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669".indexOf(d)));
+
+const sanitizePhone = (value) => normalizeArabicDigits(value).replace(/[^0-9+]/g, "");
+
+const sanitizePointsInput = (value) => {
+  const normalized = normalizeArabicDigits(value).replace(/[\u060C\u066B]/g, ".");
+  const allowed = normalized.replace(/[^\d.]/g, "");
+  const parts = allowed.split(".");
+  if (parts.length === 1) return parts[0];
+  const intPart = parts[0] || "0";
+  const decimalPart = (parts.slice(1).join("") || "").slice(0, 1);
+  return `${intPart}.${decimalPart}`;
+};
+
+const toValidAmount = (value) => {
+  const clean = sanitizePointsInput(value);
+  if (!clean) return null;
+  const n = Number(clean);
+  if (!Number.isFinite(n)) return null;
+  if (n <= 0) return null;
+  if (!Number.isInteger(n * 10)) return null;
+  return n;
+};
+
+const formatPoints = (value) => {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return "0";
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+};
 
 export default function Transfer() {
   const { profile, refreshProfile } = useAuth();
@@ -9,56 +65,107 @@ export default function Transfer() {
   const [partnerId, setPartnerId] = useState("");
   const [points, setPoints] = useState("");
   const [partners, setPartners] = useState([]);
+  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [searchingUser, setSearchingUser] = useState(false);
+  const [targetUser, setTargetUser] = useState(null);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadPartners = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, name, store_name, phone, role, disabled")
-        .eq("role", roles.PARTNER)
-        .eq("disabled", false)
-        .order("store_name", { ascending: true });
-
-      setPartners(data || []);
+    const run = async () => {
+      setLoadingPartners(true);
+      const list = await loadPartnersWithOptionalPhoto();
+      setPartners(list);
+      setLoadingPartners(false);
     };
-
-    loadPartners();
+    run();
   }, []);
+
+  const selectedPartner = useMemo(
+    () => partners.find((p) => p.id === partnerId) || null,
+    [partners, partnerId]
+  );
+  const selectedTarget = mode === "user" ? targetUser : selectedPartner;
+
+  const switchMode = (nextMode) => {
+    setMode(nextMode);
+    setPhone("");
+    setPartnerId("");
+    setTargetUser(null);
+    setPoints("");
+    setMsg("");
+    setError("");
+  };
+
+  const searchUserByPhone = async () => {
+    setMsg("");
+    setError("");
+    setTargetUser(null);
+
+    const normalizedPhone = sanitizePhone(phone);
+    if (!normalizedPhone) {
+      setError("أدخل رقم الهاتف أولاً.");
+      return;
+    }
+
+    setSearchingUser(true);
+    const { data, error: findErr } = await supabase
+      .from("profiles")
+      .select("id, role, name, phone")
+      .eq("phone", normalizedPhone)
+      .eq("role", roles.USER)
+      .maybeSingle();
+    setSearchingUser(false);
+
+    if (findErr) {
+      setError(findErr.message || "تعذر البحث عن المستخدم.");
+      return;
+    }
+
+    if (!data) {
+      setError("لا يوجد مستخدم بهذا الرقم.");
+      return;
+    }
+
+    if (data.id === profile?.id) {
+      setError("لا يمكنك التحويل إلى نفسك.");
+      return;
+    }
+
+    setTargetUser(data);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
     setError("");
+
     try {
-      const amount = Number(points);
-      if (!amount || amount <= 0) return setError("ادخل عدد نقاط صحيح");
-      if (amount > (profile?.points || 0)) return setError("لا يمكن تحويل اكثر من الرصيد");
+      const amount = toValidAmount(points);
+      if (amount === null) {
+        return setError("أدخل عدد نقاط صحيح (مثل: 0.1 أو 1.5).");
+      }
+
+      const currentBalance = Number(profile?.points || 0);
+      if (amount > currentBalance) {
+        return setError("لا يمكنك تحويل نقاط أكثر من رصيدك الحالي.");
+      }
 
       let target = null;
       let transferType = "user_to_user";
 
       if (mode === "user") {
-        const { data, error: findErr } = await supabase
-          .from("profiles")
-          .select("id, role, name, store_name, phone")
-          .eq("phone", phone)
-          .eq("role", roles.USER)
-          .maybeSingle();
-
-        if (findErr) return setError(findErr.message || "فشل البحث عن الحساب");
-        if (!data) return setError("المستخدم غير موجود");
-        target = data;
+        if (!targetUser?.id) {
+          return setError("ابحث عن المستخدم برقم الهاتف أولاً ثم أكمل التحويل.");
+        }
+        target = targetUser;
         transferType = "user_to_user";
       } else {
-        if (!partnerId) return setError("اختر محل شريك من القائمة");
-        target = partners.find((p) => p.id === partnerId) || null;
-        if (!target) return setError("المحل الشريك غير متاح");
+        if (!partnerId) return setError("اختر المحل الشريك أولاً.");
+        target = selectedPartner;
+        if (!target) return setError("المحل الشريك غير متاح حالياً.");
         transferType = "user_to_store";
       }
-
-      if (target.id === profile.id) return setError("لا يمكن التحويل لنفسك");
 
       const { error: rpcErr } = await supabase.rpc("transfer_points", {
         p_to_id: target.id,
@@ -70,13 +177,14 @@ export default function Transfer() {
       if (rpcErr) return setError(rpcErr.message);
 
       await refreshProfile();
-      const targetName = target.store_name || target.name || target.phone || "المستقبل";
-      setMsg(`تم التحويل بنجاح الى ${targetName}`);
+      const targetName = target.store_name || target.name || target.phone || "المستلم";
+      setMsg(`تم تحويل ${formatPoints(amount)} نقطة بنجاح إلى ${targetName}.`);
       setPoints("");
       setPhone("");
+      setTargetUser(null);
       setPartnerId("");
     } catch (err) {
-      setError(err?.message || "حدث خطأ غير متوقع اثناء التحويل");
+      setError(err?.message || "حدث خطأ غير متوقع أثناء التحويل.");
     }
   };
 
@@ -85,29 +193,72 @@ export default function Transfer() {
       <h1>تحويل النقاط</h1>
 
       <div className="card split">
-        <button type="button" className={`btn ${mode === "user" ? "" : "btn-outline"}`} onClick={() => setMode("user")}>
-          لمستخدم
+        <button
+          type="button"
+          className={`btn ${mode === "user" ? "" : "btn-outline"}`}
+          onClick={() => switchMode("user")}
+        >
+          إلى مستخدم
         </button>
         <button
           type="button"
           className={`btn ${mode === "partner" ? "" : "btn-outline"}`}
-          onClick={() => setMode("partner")}
+          onClick={() => switchMode("partner")}
         >
-          لمحل شريك
+          إلى محل شريك
         </button>
       </div>
 
-      <form className="card" onSubmit={submit}>
+      <div className="card">
+        <h3>رؤية سريعة</h3>
+        <p className="muted">رصيدك الحالي: {formatPoints(profile?.points)} نقطة</p>
+        <p className="muted">عدد المحلات الشريكة المتاحة: {partners.length}</p>
+      </div>
+
+      <form className="card" onSubmit={submit} noValidate>
         {mode === "user" ? (
-          <label>
-            رقم تليفون المستخدم
-            <input value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          </label>
+          <>
+            <div className="split">
+              <label style={{ flex: 1 }}>
+                رقم هاتف المستخدم المستلم
+                <input
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(sanitizePhone(e.target.value));
+                    setTargetUser(null);
+                    setMsg("");
+                    setError("");
+                  }}
+                  required
+                />
+              </label>
+              <button type="button" className="btn" onClick={searchUserByPhone} disabled={searchingUser}>
+                {searchingUser ? "جاري البحث..." : "بحث"}
+              </button>
+            </div>
+
+            {targetUser ? (
+              <div className="card" style={{ marginTop: 8 }}>
+                <p>
+                  <strong>تم العثور على المستخدم:</strong> {targetUser.name || "-"}
+                </p>
+                <p className="muted">الهاتف: {targetUser.phone || "-"}</p>
+              </div>
+            ) : null}
+          </>
         ) : (
           <label>
             اختر المحل الشريك
-            <select value={partnerId} onChange={(e) => setPartnerId(e.target.value)} required>
-              <option value="">اختر محل...</option>
+            <select
+              value={partnerId}
+              onChange={(e) => {
+                setPartnerId(e.target.value);
+                setMsg("");
+                setError("");
+              }}
+              required
+            >
+              <option value="">اختر محلاً...</option>
               {partners.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.store_name || p.name} - {p.phone}
@@ -117,18 +268,72 @@ export default function Transfer() {
           </label>
         )}
 
+        {selectedTarget ? (
+          <div className="card" style={{ marginTop: 8, marginBottom: 8 }}>
+            <p>
+              <strong>المستلم المختار:</strong>{" "}
+              {selectedTarget.store_name || selectedTarget.name || "-"}
+            </p>
+            <p className="muted">الهاتف: {selectedTarget.phone || "-"}</p>
+          </div>
+        ) : (
+          <p className="muted" style={{ marginTop: 8, marginBottom: 8 }}>
+            اختر المستلم أولاً قبل تأكيد التحويل.
+          </p>
+        )}
+
         <label>
           عدد النقاط
-          <input type="number" min="1" value={points} onChange={(e) => setPoints(e.target.value)} required />
+          <input
+            type="text"
+            inputMode="decimal"
+            placeholder="مثال: 0.1 أو 1.5"
+            value={points}
+            onChange={(e) => {
+              setPoints(sanitizePointsInput(e.target.value));
+              setMsg("");
+              setError("");
+            }}
+            required
+          />
         </label>
 
         {msg ? <p className="success">{msg}</p> : null}
         {error ? <p className="error">{error}</p> : null}
 
-        <button className="btn" type="submit">
-          تأكيد التحويل
+        <button className="btn" type="submit" disabled={!selectedTarget || searchingUser}>
+          {!selectedTarget ? "اختر المستلم أولاً" : "تأكيد التحويل"}
         </button>
       </form>
+
+      {mode === "partner" ? (
+        <div className="card">
+          <h3>المحلات الشريكة</h3>
+          {loadingPartners ? <p className="muted">جاري تحميل قائمة المحلات...</p> : null}
+          <div className="shops-grid">
+            {partners.map((shop) => (
+              <article className="shop-item" key={shop.id}>
+                <img
+                  src={shop.photo_url || "/icons/icon-192.svg"}
+                  alt={shop.store_name || shop.name || "محل"}
+                  className="shop-photo"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "/icons/icon-192.svg";
+                  }}
+                />
+                <div>
+                  <h4>{shop.store_name || shop.name || "-"}</h4>
+                  <p className="muted">{shop.phone || "-"}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+          {!partners.length && !loadingPartners ? (
+            <p className="muted">لا توجد محلات شريكة متاحة حالياً.</p>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }

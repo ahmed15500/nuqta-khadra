@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
+const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
+
 export default function Login() {
   const { login, session, profile } = useAuth();
   const navigate = useNavigate();
@@ -32,13 +34,37 @@ export default function Login() {
   return (
     <main className="auth-wrap">
       <form className="card auth-card" onSubmit={onSubmit}>
-        <h1>تسجيل الدخول</h1>
+        <div className="auth-brand">
+          <img src="/icons/icon-192.svg" alt="شعار نقطة خضراء" className="auth-logo" />
+          <div>
+            <h1>نقطة خضراء</h1>
+            <p className="muted">من المخلفات إلى قيمة</p>
+          </div>
+        </div>
+
+        <a className="powered-by auth-powered" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
+          <img
+            src={rdcLogoUrl}
+            alt="Rural Development Center - Heliopolis University"
+            className="powered-logo"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <span className="powered-copy">
+            <small>Powered by</small>
+            <strong>Rural Development Center - Heliopolis University</strong>
+          </span>
+        </a>
+
         <label>
-          رقم التليفون
+          رقم الهاتف
           <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} required />
         </label>
+
         <label>
-          كلمة السر
+          كلمة المرور
           <input
             type="password"
             value={form.password}
@@ -46,10 +72,13 @@ export default function Login() {
             required
           />
         </label>
+
         {error ? <p className="error">{error}</p> : null}
+
         <button className="btn" disabled={loading}>
-          {loading ? "جاري الدخول..." : "دخول"}
+          {loading ? "جاري تسجيل الدخول..." : "تسجيل الدخول"}
         </button>
+
         <p className="muted">
           مستخدم جديد؟ <Link to="/register">إنشاء حساب</Link>
         </p>

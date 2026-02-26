@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
+import AppUpdateNotice from "./components/AppUpdateNotice";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -92,18 +92,12 @@ function StateScreen({ title, subtitle, action = null }) {
 
 export default function App() {
   const { session } = useAuth();
-  const location = useLocation();
-  const showNavbar = session && location.pathname !== "/admin";
-
-  useEffect(() => {
-    const isAdminPage = location.pathname === "/admin";
-    document.body.classList.toggle("admin-mode", isAdminPage);
-    return () => document.body.classList.remove("admin-mode");
-  }, [location.pathname]);
+  const showNavbar = session;
 
   return (
     <>
       {showNavbar ? <Navbar /> : null}
+      <AppUpdateNotice />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
         <Route path="/login" element={<Login />} />

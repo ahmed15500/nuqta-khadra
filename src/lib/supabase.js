@@ -6,12 +6,12 @@ const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey);
 
 if (!hasSupabaseEnv) {
   // Keep app booting and surface a visible auth error screen instead of a white page crash.
-  console.error("Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+  console.error("متغيرات Supabase غير موجودة. أضف VITE_SUPABASE_URL و VITE_SUPABASE_ANON_KEY.");
 }
 
 export const supabaseConfigError = hasSupabaseEnv
   ? ""
-  : "Missing Supabase environment variables (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).";
+  : "متغيرات Supabase غير مضبوطة (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).";
 
 export const supabase = createClient(
   supabaseUrl || "https://invalid.supabase.co",

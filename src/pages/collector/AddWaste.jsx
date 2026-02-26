@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 export default function AddWaste() {
@@ -35,7 +35,7 @@ export default function AddWaste() {
 
     if (qErr) {
       setTargetUser(null);
-      setError("المستخدم غير موجود");
+      setError("Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯");
       return;
     }
     setTargetUser(data);
@@ -46,11 +46,11 @@ export default function AddWaste() {
     setMsg("");
     setError("");
 
-    if (!targetUser) return setError("ابحث عن المستخدم أولاً");
-    if (!selectedType) return setError("اختر نوع مخلفة");
+    if (!targetUser) return setError("Ø§Ø¨Ø­Ø« Ø¹Ù† Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù… Ø£ÙˆÙ„Ø§Ù‹");
+    if (!selectedType) return setError("Ø§Ø®ØªØ± Ù†ÙˆØ¹ Ù…Ø®Ù„ÙØ©");
 
     const weight = Number(form.weightKg);
-    if (!weight || weight <= 0) return setError("أدخل وزن صحيح");
+    if (!weight || weight <= 0) return setError("Ø£Ø¯Ø®Ù„ ÙˆØ²Ù† ØµØ­ÙŠØ­");
 
     const { data: rpcData, error: rpcErr } = await supabase.rpc("award_waste_points", {
       p_user_id: targetUser.id,
@@ -61,45 +61,45 @@ export default function AddWaste() {
 
     const awarded = rpcData?.[0]?.points_awarded ?? calcPoints;
 
-    setMsg("تمت إضافة العملية وتحديث رصيد المستخدم");
-    setTargetUser((p) => ({ ...p, points: (p.points || 0) + awarded }));
+    setMsg("ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ø¹Ù…Ù„ÙŠØ© ÙˆØªØ­Ø¯ÙŠØ« Ø±ØµÙŠØ¯ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…");
+    setTargetUser((p) => ({ ...p, points: Number(p.points || 0) + Number(awarded || 0) }));
     setForm((p) => ({ ...p, weightKg: "" }));
   };
 
   return (
     <section className="page">
-      <h1>إضافة عملية مخلفات</h1>
+      <h1>Ø¥Ø¶Ø§ÙØ© Ø¹Ù…Ù„ÙŠØ© Ù…Ø®Ù„ÙØ§Øª</h1>
       <div className="card split">
         <div>
-          <label>رقم تليفون المستخدم</label>
+          <label>Ø±Ù‚Ù… ØªÙ„ÙŠÙÙˆÙ† Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <button className="btn" onClick={findUser}>
-          بحث
+          Ø¨Ø­Ø«
         </button>
       </div>
 
       {targetUser ? (
         <div className="card">
-          <p>الاسم: {targetUser.name}</p>
-          <p>الرصيد الحالي: {targetUser.points} نقطة</p>
+          <p>Ø§Ù„Ø§Ø³Ù…: {targetUser.name}</p>
+          <p>Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„Ø­Ø§Ù„ÙŠ: {targetUser.points} Ù†Ù‚Ø·Ø©</p>
         </div>
       ) : null}
 
       <form className="card" onSubmit={submit}>
         <label>
-          نوع المخلفة
+          Ù†ÙˆØ¹ Ø§Ù„Ù…Ø®Ù„ÙØ©
           <select value={form.wasteTypeId} onChange={(e) => setForm((p) => ({ ...p, wasteTypeId: e.target.value }))} required>
-            <option value="">اختر...</option>
+            <option value="">Ø§Ø®ØªØ±...</option>
             {wasteTypes.map((w) => (
               <option key={w.id} value={w.id}>
-                {w.icon} {w.name} ({w.points_per_kg} نقطة/كجم)
+                {w.icon} {w.name} ({w.points_per_kg} Ù†Ù‚Ø·Ø©/ÙƒØ¬Ù…)
               </option>
             ))}
           </select>
         </label>
         <label>
-          الوزن (كجم)
+          Ø§Ù„ÙˆØ²Ù† (ÙƒØ¬Ù…)
           <input
             type="number"
             min="0.1"
@@ -110,14 +110,15 @@ export default function AddWaste() {
           />
         </label>
         <p>
-          النقاط المحسوبة: <strong>{calcPoints}</strong>
+          Ø§Ù„Ù†Ù‚Ø§Ø· Ø§Ù„Ù…Ø­Ø³ÙˆØ¨Ø©: <strong>{calcPoints}</strong>
         </p>
         {msg ? <p className="success">{msg}</p> : null}
         {error ? <p className="error">{error}</p> : null}
         <button className="btn" type="submit">
-          تأكيد العملية
+          ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø¹Ù…Ù„ÙŠØ©
         </button>
       </form>
     </section>
   );
 }
+

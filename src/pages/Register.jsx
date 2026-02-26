@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
+const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
+
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
@@ -28,6 +30,22 @@ export default function Register() {
     <main className="auth-wrap">
       <form className="card auth-card" onSubmit={onSubmit}>
         <h1>إنشاء حساب مستخدم</h1>
+
+        <a className="powered-by auth-powered" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
+          <img
+            src={rdcLogoUrl}
+            alt="Rural Development Center - Heliopolis University"
+            className="powered-logo"
+            loading="lazy"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+          <span className="powered-copy">
+            <small>Powered by</small>
+            <strong>Rural Development Center - Heliopolis University</strong>
+          </span>
+        </a>
 
         <label>
           الاسم

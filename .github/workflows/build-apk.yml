@@ -31,6 +31,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve build metadata
+        id: meta
+        run: |
+          echo "version_name=0.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
       - name: Validate required secrets
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
@@ -44,6 +49,8 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+          VITE_APP_VERSION: ${{ steps.meta.outputs.version_name }}
 
       - name: Capacitor sync android
         run: npx cap sync android

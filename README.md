@@ -96,7 +96,7 @@ Then in Android Studio:
 1. `Build` > `Build Bundle(s) / APK(s)` > `Build APK(s)` (debug), or
 2. `Build` > `Generate Signed Bundle / APK` (release).
 
-## GitHub Releases APK (Free)
+## GitHub Releases APK (Free + Updatable)
 
 This repo includes workflow:
 - `.github/workflows/release-apk.yml`
@@ -104,21 +104,47 @@ This repo includes workflow:
 What it does:
 1. Builds web assets
 2. Syncs Capacitor Android
-3. Builds `app-debug.apk`
+3. Builds a **signed release APK**
 4. Uploads APK to your GitHub Release automatically
+5. Embeds app version + repo so the app can check for latest release update
 
 One-time setup in GitHub:
 1. Go to `Settings` > `Secrets and variables` > `Actions`.
 2. Add repository secrets:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `ANDROID_KEYSTORE_BASE64` (base64 of your `.jks` or `.keystore`)
+   - `ANDROID_KEYSTORE_PASSWORD`
+   - `ANDROID_KEY_ALIAS`
+   - `ANDROID_KEY_PASSWORD`
+
+PowerShell helper to generate `ANDROID_KEYSTORE_BASE64`:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("D:\path\to\release.keystore"))
+```
+
+Important for in-place updates (install over old version):
+- Use the **same package id** (`com.nuqta.khadra`) for every release.
+- Use the **same signing key** for every release.
+- Increase app version every release (tag `v1.0.0`, `v1.0.1`, ...).
 
 How to publish APK:
 1. Go to `Releases` > `Draft a new release`.
 2. Create a tag like `v1.0.0`.
 3. Click `Publish release`.
-4. Wait for Actions workflow `Build APK And Attach To Release`.
+4. Wait for Actions workflow `Build Signed APK And Attach To Release`.
 5. Download APK from the same release assets.
+
+## In-App Update Prompt
+
+The app checks GitHub latest release on startup and shows an update prompt when a newer APK exists.
+
+Required env variables at build time:
+- `VITE_GITHUB_REPO` (example: `ahmed15500/nuqta-khadra`)
+- `VITE_APP_VERSION` (example: `1.0.0`)
+
+The release workflow already sets both automatically.
 
 ## Update Cycle
 

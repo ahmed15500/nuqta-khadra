@@ -88,6 +88,30 @@ export default function UserHome() {
     return rows.filter((x) => new Date(x.created_at).toDateString() === today).length;
   }, [rows]);
 
+  const insights = useMemo(() => {
+    const wasteCount = rows.filter((x) => String(x.id).startsWith("w-")).length;
+    const sentCount = rows.filter((x) => String(x.id).startsWith("s-")).length;
+    const receivedCount = rows.filter((x) => String(x.id).startsWith("r-")).length;
+
+    const netPoints = rows.reduce((sum, row) => {
+      const value = Number(String(row.points).replace("+", "")) || 0;
+      return sum + value;
+    }, 0);
+
+    const currentPoints = Number(profile?.points || 0);
+    const nextGoal = Math.floor(currentPoints / 100) * 100 + 100;
+    const remaining = Math.max(0, nextGoal - currentPoints);
+
+    return {
+      wasteCount,
+      sentCount,
+      receivedCount,
+      netPoints,
+      nextGoal,
+      remaining
+    };
+  }, [rows, profile?.points]);
+
   return (
     <section className="page">
       <h1>لوحة المستخدم</h1>
@@ -106,6 +130,32 @@ export default function UserHome() {
             <span>إجمالي آخر النشاطات</span>
             <strong>{rows.length}</strong>
           </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h2>رؤى سريعة</h2>
+        <div className="insights-grid">
+          <article className="insight-item">
+            <p className="muted">الهدف القادم</p>
+            <p className="big">{insights.nextGoal} نقطة</p>
+            <p className="muted">المتبقي للوصول للهدف: {insights.remaining} نقطة</p>
+          </article>
+          <article className="insight-item">
+            <p className="muted">صافي الحركة في آخر العمليات</p>
+            <p className={`big ${insights.netPoints < 0 ? "points-negative" : "points-positive"}`}>
+              {insights.netPoints > 0 ? "+" : ""}
+              {insights.netPoints}
+            </p>
+            <p className="muted">فرق النقاط المكتسبة مقابل المحولة.</p>
+          </article>
+          <article className="insight-item">
+            <p className="muted">ملخص النشاط</p>
+            <p className="big">{insights.wasteCount} عمليات جمع</p>
+            <p className="muted">
+              تحويلات صادرة: {insights.sentCount} | تحويلات واردة: {insights.receivedCount}
+            </p>
+          </article>
         </div>
       </div>
 

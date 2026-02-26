@@ -6,7 +6,14 @@ import App from "./App";
 import { AuthProvider } from "./contexts/AuthContext";
 import "./index.css";
 
-registerSW({ immediate: true });
+if (import.meta.env.PROD) {
+  registerSW({ immediate: true });
+} else if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  // Prevent stale dev cache/service worker from causing local "stuck loading" behavior.
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+  });
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
