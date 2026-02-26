@@ -2,12 +2,21 @@ import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const hasSupabaseEnv = Boolean(supabaseUrl && supabaseAnonKey);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+if (!hasSupabaseEnv) {
+  // Keep app booting and surface a visible auth error screen instead of a white page crash.
+  console.error("Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseConfigError = hasSupabaseEnv
+  ? ""
+  : "Missing Supabase environment variables (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).";
+
+export const supabase = createClient(
+  supabaseUrl || "https://invalid.supabase.co",
+  supabaseAnonKey || "invalid-anon-key"
+);
 
 export const createEphemeralSupabaseClient = () =>
   createClient(supabaseUrl, supabaseAnonKey, {

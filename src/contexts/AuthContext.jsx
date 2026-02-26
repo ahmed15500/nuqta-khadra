@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { supabase, phoneToEmail } from "../lib/supabase";
+import { supabase, phoneToEmail, supabaseConfigError } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 
@@ -61,6 +61,12 @@ export function AuthProvider({ children }) {
   };
 
   const syncAuthState = async () => {
+    if (supabaseConfigError) {
+      setAuthError(supabaseConfigError);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setAuthError("");
 
