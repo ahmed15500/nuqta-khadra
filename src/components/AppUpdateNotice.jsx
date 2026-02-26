@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const FALLBACK_REPO = "ahmed15500/nuqta-khadra";
+const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 function normalizeVersion(value) {
   return String(value || "")
@@ -54,7 +55,7 @@ export default function AppUpdateNotice() {
 
     const run = async () => {
       try {
-        const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+        const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest?ts=${Date.now()}`, {
           headers: { Accept: "application/vnd.github+json" }
         });
 
@@ -65,8 +66,12 @@ export default function AppUpdateNotice() {
 
         if (compareVersions(latestVersion, currentVersion) <= 0) return;
 
-        const apkAsset = (release.assets || []).find((asset) => /\.apk$/i.test(asset?.name || ""));
-        const downloadUrl = apkAsset?.browser_download_url || "";
+        const apkAsset = (release.assets || []).find(
+          (asset) =>
+            /\.apk$/i.test(asset?.name || "") ||
+            String(asset?.content_type || "").toLowerCase().includes("android.package-archive")
+        );
+        const downloadUrl = apkAsset?.browser_download_url || release.html_url || "";
         if (!downloadUrl) return;
 
         const savedDismiss = localStorage.getItem(`nuqta_update_dismissed_${latestVersion}`);
@@ -75,17 +80,30 @@ export default function AppUpdateNotice() {
         if (!cancelled) {
           setUpdateInfo({
             latestVersion,
-            downloadUrl
+            downloadUrl,
+            source: apkAsset ? "apk" : "release"
           });
         }
       } catch {
-        // Ignore update-check errors to keep app startup resilient.
+        // Keep startup resilient if update check fails.
       }
     };
 
     run();
+    const intervalId = window.setInterval(run, CHECK_INTERVAL_MS);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        run();
+      }
+    };
+    window.addEventListener("focus", run);
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", run);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [repo, currentVersion, isNativeApp]);
 
@@ -106,8 +124,11 @@ export default function AppUpdateNotice() {
   return (
     <section className="update-banner" role="status" aria-live="polite">
       <div className="update-copy">
-        <strong>يوجد إصدار جديد متاح للتطبيق</strong>
-        <p className="muted">الإصدار الحالي: {currentVersion} - الإصدار الجديد: {updateInfo.latestVersion}</p>
+        <strong>يوجد تحديث جديد للتطبيق</strong>
+        <p className="muted">
+          الإصدار الحالي: {currentVersion} - الإصدار الجديد: {updateInfo.latestVersion}
+          {updateInfo.source === "release" ? " (من صفحة الإصدار على GitHub)" : ""}
+        </p>
       </div>
       <div className="update-actions">
         <button className="btn btn-small" onClick={onUpdate}>

@@ -144,6 +144,9 @@ export default function AdminHome() {
         <Link to="/admin/transactions" className="btn btn-outline">
           إدارة المعاملات
         </Link>
+        <Link to="/admin/settlements" className="btn btn-outline">
+          التسويات المالية
+        </Link>
       </div>
 
       <div className="grid-3">

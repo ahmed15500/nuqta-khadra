@@ -34,11 +34,10 @@ export default function Login() {
   return (
     <main className="auth-wrap">
       <form className="card auth-card" onSubmit={onSubmit}>
-        <div className="auth-brand">
-          <img src="/icons/icon-192.svg" alt="شعار نقطة خضراء" className="auth-logo" />
-          <div>
-            <h1>نقطة خضراء</h1>
-            <p className="muted">من المخلفات إلى قيمة</p>
+        <div className="auth-brand auth-brand-login">
+          <div className="auth-brand-copy">
+            <h1>Waste Miza</h1>
+            <p className="auth-tagline-en">Turn your waste into rewards</p>
           </div>
         </div>
 

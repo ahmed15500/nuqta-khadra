@@ -61,6 +61,29 @@ create table if not exists public.point_transfers (
   to_id uuid not null references public.profiles(id),
   points numeric(12,1) not null check (points > 0),
   transfer_type text not null check (transfer_type in ('user_to_user','user_to_store')),
+  sender_name text,
+  sender_phone text,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.point_cash_rates (
+  id integer primary key default 1 check (id = 1),
+  user_cash_per_point numeric(12,4) not null default 0,
+  shop_cash_per_point numeric(12,4) not null default 0,
+  updated_by uuid references public.profiles(id),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.point_settlements (
+  id uuid primary key default gen_random_uuid(),
+  beneficiary_id uuid not null references public.profiles(id),
+  beneficiary_role text not null check (beneficiary_role in ('user','partner_store','collector_store')),
+  points_before numeric(12,1) not null check (points_before > 0),
+  points_settled numeric(12,1) not null check (points_settled > 0),
+  cash_per_point numeric(12,4) not null check (cash_per_point >= 0),
+  cash_amount numeric(14,2) not null check (cash_amount >= 0),
+  paid_by_admin_id uuid not null references public.profiles(id),
   note text,
   created_at timestamptz not null default now()
 );
@@ -75,11 +98,28 @@ alter table public.point_transfers
   alter column points type numeric(12,1)
   using round(points::numeric, 1);
 
+alter table public.point_transfers add column if not exists sender_name text;
+alter table public.point_transfers add column if not exists sender_phone text;
+
+update public.point_transfers pt
+set
+  sender_name = coalesce(pt.sender_name, p.name),
+  sender_phone = coalesce(pt.sender_phone, p.phone)
+from public.profiles p
+where pt.from_id = p.id
+  and (pt.sender_name is null or pt.sender_phone is null);
+
 create index if not exists idx_profiles_role on public.profiles(role);
 create index if not exists idx_waste_transactions_user on public.waste_transactions(user_id);
 create index if not exists idx_waste_transactions_collector on public.waste_transactions(collector_store_id);
 create index if not exists idx_point_transfers_from on public.point_transfers(from_id);
 create index if not exists idx_point_transfers_to on public.point_transfers(to_id);
+create index if not exists idx_point_settlements_beneficiary on public.point_settlements(beneficiary_id);
+create index if not exists idx_point_settlements_created_at on public.point_settlements(created_at desc);
+
+insert into public.point_cash_rates (id, user_cash_per_point, shop_cash_per_point)
+values (1, 1, 1)
+on conflict (id) do nothing;
 
 insert into public.waste_types (name, points_per_kg, icon)
 values
@@ -99,6 +139,8 @@ alter table public.profiles enable row level security;
 alter table public.waste_types enable row level security;
 alter table public.waste_transactions enable row level security;
 alter table public.point_transfers enable row level security;
+alter table public.point_cash_rates enable row level security;
+alter table public.point_settlements enable row level security;
 
 -- Helper function to read current role without triggering RLS recursion.
 create or replace function public.current_profile_role()
@@ -159,7 +201,7 @@ on public.profiles for select
 using (
   (
     (role = 'user' and id <> auth.uid())
-    or role = 'partner_store'
+    or role in ('partner_store', 'collector_store')
   )
   and public.current_profile_role() = 'user'
 );
@@ -208,6 +250,28 @@ using (
   or to_id = auth.uid()
   or public.current_profile_role() = 'admin'
 );
+
+drop policy if exists "point_cash_rates_admin_read" on public.point_cash_rates;
+create policy "point_cash_rates_admin_read"
+on public.point_cash_rates for select
+using (public.current_profile_role() = 'admin');
+
+drop policy if exists "point_cash_rates_admin_write" on public.point_cash_rates;
+create policy "point_cash_rates_admin_write"
+on public.point_cash_rates for all
+using (public.current_profile_role() = 'admin')
+with check (public.current_profile_role() = 'admin');
+
+drop policy if exists "point_settlements_admin_read" on public.point_settlements;
+create policy "point_settlements_admin_read"
+on public.point_settlements for select
+using (public.current_profile_role() = 'admin');
+
+drop policy if exists "point_settlements_admin_write" on public.point_settlements;
+create policy "point_settlements_admin_write"
+on public.point_settlements for all
+using (public.current_profile_role() = 'admin')
+with check (public.current_profile_role() = 'admin');
 
 create or replace function public.award_waste_points(
   p_user_id uuid,
@@ -289,6 +353,8 @@ declare
   v_from_id uuid := auth.uid();
   v_from_role text;
   v_from_points numeric(12,1);
+  v_from_name text;
+  v_from_phone text;
   v_to_role text;
   v_transfer_id uuid;
   v_points numeric(12,1);
@@ -311,7 +377,11 @@ begin
     raise exception 'Cannot transfer to self';
   end if;
 
-  select role, points into v_from_role, v_from_points from public.profiles where id = v_from_id for update;
+  select role, points, name, phone
+  into v_from_role, v_from_points, v_from_name, v_from_phone
+  from public.profiles
+  where id = v_from_id
+  for update;
   if v_from_role <> 'user' then
     raise exception 'Only users can transfer points';
   end if;
@@ -329,8 +399,8 @@ begin
     raise exception 'Recipient must be user';
   end if;
 
-  if p_transfer_type = 'user_to_store' and v_to_role <> 'partner_store' then
-    raise exception 'Recipient must be partner store';
+  if p_transfer_type = 'user_to_store' and v_to_role not in ('partner_store', 'collector_store') then
+    raise exception 'Recipient must be partner or collector store';
   end if;
 
   if p_transfer_type not in ('user_to_user','user_to_store') then
@@ -340,11 +410,159 @@ begin
   update public.profiles set points = points - v_points where id = v_from_id;
   update public.profiles set points = points + v_points where id = p_to_id;
 
-  insert into public.point_transfers (from_id, to_id, points, transfer_type, note)
-  values (v_from_id, p_to_id, v_points, p_transfer_type, p_note)
+  insert into public.point_transfers (from_id, to_id, points, transfer_type, sender_name, sender_phone, note)
+  values (v_from_id, p_to_id, v_points, p_transfer_type, v_from_name, v_from_phone, p_note)
   returning id into v_transfer_id;
 
   return v_transfer_id;
+end;
+$$;
+
+create or replace function public.admin_set_cash_rates(
+  p_user_cash_per_point numeric,
+  p_shop_cash_per_point numeric
+)
+returns table(user_cash_per_point numeric, shop_cash_per_point numeric, updated_at timestamptz)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_admin_role text;
+begin
+  select pr.role into v_admin_role
+  from public.profiles pr
+  where pr.id = v_admin_id;
+
+  if v_admin_role <> 'admin' then
+    raise exception 'Only admin can set cash rates';
+  end if;
+
+  if p_user_cash_per_point is null or p_user_cash_per_point < 0 then
+    raise exception 'User cash rate must be >= 0';
+  end if;
+
+  if p_shop_cash_per_point is null or p_shop_cash_per_point < 0 then
+    raise exception 'Shop cash rate must be >= 0';
+  end if;
+
+  insert into public.point_cash_rates (id, user_cash_per_point, shop_cash_per_point, updated_by, updated_at)
+  values (1, p_user_cash_per_point, p_shop_cash_per_point, v_admin_id, now())
+  on conflict (id) do update
+  set
+    user_cash_per_point = excluded.user_cash_per_point,
+    shop_cash_per_point = excluded.shop_cash_per_point,
+    updated_by = excluded.updated_by,
+    updated_at = excluded.updated_at;
+
+  return query
+  select r.user_cash_per_point, r.shop_cash_per_point, r.updated_at
+  from public.point_cash_rates r
+  where r.id = 1;
+end;
+$$;
+
+create or replace function public.admin_settle_profile_points(
+  p_profile_id uuid,
+  p_note text default null
+)
+returns table(
+  settlement_id uuid,
+  beneficiary_id uuid,
+  beneficiary_role text,
+  points_settled numeric,
+  cash_per_point numeric,
+  cash_amount numeric
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_admin_role text;
+  v_target_role text;
+  v_points numeric(12,1);
+  v_rate numeric(12,4);
+  v_cash numeric(14,2);
+  v_settlement_id uuid;
+begin
+  select pr.role into v_admin_role
+  from public.profiles pr
+  where pr.id = v_admin_id;
+
+  if v_admin_role <> 'admin' then
+    raise exception 'Only admin can settle balances';
+  end if;
+
+  select p.role, p.points
+  into v_target_role, v_points
+  from public.profiles p
+  where p.id = p_profile_id
+  for update;
+
+  if v_target_role is null then
+    raise exception 'Target profile not found';
+  end if;
+
+  if v_target_role not in ('user','partner_store','collector_store') then
+    raise exception 'Target role is not settleable';
+  end if;
+
+  if v_points is null or v_points <= 0 then
+    raise exception 'No points to settle for this profile';
+  end if;
+
+  select
+    case
+      when v_target_role = 'user' then r.user_cash_per_point
+      else r.shop_cash_per_point
+    end
+  into v_rate
+  from public.point_cash_rates r
+  where r.id = 1;
+
+  if v_rate is null then
+    raise exception 'Cash rates are not configured';
+  end if;
+
+  v_cash := round((v_points * v_rate)::numeric, 2);
+
+  insert into public.point_settlements (
+    beneficiary_id,
+    beneficiary_role,
+    points_before,
+    points_settled,
+    cash_per_point,
+    cash_amount,
+    paid_by_admin_id,
+    note
+  )
+  values (
+    p_profile_id,
+    v_target_role,
+    v_points,
+    v_points,
+    v_rate,
+    v_cash,
+    v_admin_id,
+    nullif(trim(coalesce(p_note, '')), '')
+  )
+  returning id into v_settlement_id;
+
+  update public.profiles
+  set points = 0
+  where id = p_profile_id;
+
+  return query
+  select
+    v_settlement_id,
+    p_profile_id,
+    v_target_role,
+    v_points,
+    v_rate,
+    v_cash;
 end;
 $$;
 
@@ -577,8 +795,652 @@ begin
 end;
 $$;
 
+create table if not exists public.league_settings (
+  id integer primary key default 1 check (id = 1),
+  league_size integer not null default 20 check (league_size >= 5),
+  promote_count integer not null default 3 check (promote_count >= 0),
+  demote_count integer not null default 3 check (demote_count >= 0),
+  enabled boolean not null default true,
+  updated_by uuid references public.profiles(id),
+  updated_at timestamptz not null default now(),
+  check (promote_count + demote_count < league_size)
+);
+
+create table if not exists public.league_weeks (
+  id uuid primary key default gen_random_uuid(),
+  week_start date not null unique,
+  week_end date not null,
+  status text not null default 'open' check (status in ('open', 'closed')),
+  closed_by_admin_id uuid references public.profiles(id),
+  closed_at timestamptz,
+  created_at timestamptz not null default now(),
+  check (week_end > week_start)
+);
+
+create table if not exists public.league_memberships (
+  id uuid primary key default gen_random_uuid(),
+  week_id uuid not null references public.league_weeks(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  league_tier integer not null default 1 check (league_tier >= 1),
+  weekly_points numeric(12,1) not null default 0,
+  rank integer,
+  created_at timestamptz not null default now(),
+  unique (week_id, user_id)
+);
+
+create index if not exists idx_league_weeks_status_start on public.league_weeks(status, week_start desc);
+drop index if exists public.idx_league_weeks_single_open;
+create index if not exists idx_league_memberships_week_tier_rank on public.league_memberships(week_id, league_tier, rank);
+create index if not exists idx_league_memberships_user on public.league_memberships(user_id);
+
+insert into public.league_settings (id, league_size, promote_count, demote_count, enabled)
+values (1, 20, 3, 3, true)
+on conflict (id) do nothing;
+
+alter table public.league_settings enable row level security;
+alter table public.league_weeks enable row level security;
+alter table public.league_memberships enable row level security;
+
+drop policy if exists "league_settings_read_all" on public.league_settings;
+create policy "league_settings_read_all"
+on public.league_settings for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "league_settings_admin_write" on public.league_settings;
+create policy "league_settings_admin_write"
+on public.league_settings for all
+using (public.current_profile_role() = 'admin')
+with check (public.current_profile_role() = 'admin');
+
+drop policy if exists "league_weeks_read_all" on public.league_weeks;
+create policy "league_weeks_read_all"
+on public.league_weeks for select
+using (auth.role() = 'authenticated');
+
+drop policy if exists "league_weeks_admin_write" on public.league_weeks;
+create policy "league_weeks_admin_write"
+on public.league_weeks for all
+using (public.current_profile_role() = 'admin')
+with check (public.current_profile_role() = 'admin');
+
+drop policy if exists "league_memberships_admin_read" on public.league_memberships;
+create policy "league_memberships_admin_read"
+on public.league_memberships for select
+using (public.current_profile_role() = 'admin');
+
+drop policy if exists "league_memberships_admin_write" on public.league_memberships;
+create policy "league_memberships_admin_write"
+on public.league_memberships for all
+using (public.current_profile_role() = 'admin')
+with check (public.current_profile_role() = 'admin');
+
+create or replace function public.league_tier_name(p_tier integer)
+returns text
+language sql
+stable
+as $$
+  select case
+    when coalesce(p_tier, 1) <= 1 then 'Bronze League'
+    when p_tier = 2 then 'Silver League'
+    when p_tier = 3 then 'Gold League'
+    when p_tier = 4 then 'Platinum League'
+    when p_tier = 5 then 'Diamond League'
+    else 'Legend League ' || p_tier::text
+  end;
+$$;
+
+create or replace function public.ensure_current_league_week()
+returns table(week_id uuid, week_start date, week_end date, status text)
+language plpgsql
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+declare
+  v_week_start date := date_trunc('week', timezone('utc', now()))::date;
+  v_week_end date := (v_week_start + 7);
+begin
+  insert into public.league_weeks (week_start, week_end, status)
+  values (v_week_start, v_week_end, 'open')
+  on conflict (week_start) do nothing;
+
+  update public.league_weeks lw
+  set
+    status = 'closed',
+    closed_at = coalesce(lw.closed_at, now())
+  where lw.status = 'open'
+    and lw.week_start < v_week_start;
+
+  return query
+  select lw.id, lw.week_start, lw.week_end, lw.status
+  from public.league_weeks lw
+  where lw.week_start = v_week_start
+  limit 1;
+end;
+$$;
+
+create or replace function public.league_refresh_current_scores()
+returns table(week_id uuid, week_start date, week_end date, participants integer)
+language plpgsql
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+declare
+  v_week_id uuid;
+  v_week_start date;
+  v_week_end date;
+  v_prev_week_id uuid;
+  v_league_size integer;
+  v_promote_count integer;
+  v_demote_count integer;
+  v_enabled boolean;
+begin
+  insert into public.league_settings (id, league_size, promote_count, demote_count, enabled)
+  values (1, 20, 3, 3, true)
+  on conflict (id) do nothing;
+
+  select ls.league_size, ls.promote_count, ls.demote_count, ls.enabled
+  into v_league_size, v_promote_count, v_demote_count, v_enabled
+  from public.league_settings ls
+  where ls.id = 1;
+
+  v_league_size := greatest(coalesce(v_league_size, 20), 5);
+  v_promote_count := greatest(coalesce(v_promote_count, 3), 0);
+  v_demote_count := greatest(coalesce(v_demote_count, 3), 0);
+
+  select ew.week_id, ew.week_start, ew.week_end
+  into v_week_id, v_week_start, v_week_end
+  from public.ensure_current_league_week() ew
+  limit 1;
+
+  if v_week_id is null then
+    raise exception 'Unable to initialize league week';
+  end if;
+
+  select lw.id
+  into v_prev_week_id
+  from public.league_weeks lw
+  where lw.status = 'closed'
+    and lw.week_end <= v_week_start
+  order by lw.week_start desc
+  limit 1;
+
+  if not exists (select 1 from public.league_memberships lm where lm.week_id = v_week_id) then
+    if v_prev_week_id is null then
+      insert into public.league_memberships (week_id, user_id, league_tier, weekly_points)
+      select v_week_id, p.id, 1, 0
+      from public.profiles p
+      where p.role = 'user'
+        and coalesce(p.disabled, false) = false;
+    else
+      with prev_rows as (
+        select
+          lm.user_id,
+          lm.league_tier,
+          lm.rank,
+          count(*) over (partition by lm.league_tier) as tier_population
+        from public.league_memberships lm
+        join public.profiles p
+          on p.id = lm.user_id
+        where lm.week_id = v_prev_week_id
+          and p.role = 'user'
+          and coalesce(p.disabled, false) = false
+      ),
+      moved as (
+        select
+          pr.user_id,
+          case
+            when v_promote_count > 0 and pr.rank is not null and pr.rank <= v_promote_count then pr.league_tier + 1
+            when v_demote_count > 0 and pr.rank is not null and pr.rank > greatest(pr.tier_population - v_demote_count, 0)
+              then greatest(1, pr.league_tier - 1)
+            else pr.league_tier
+          end as next_tier
+        from prev_rows pr
+      )
+      insert into public.league_memberships (week_id, user_id, league_tier, weekly_points)
+      select
+        v_week_id,
+        p.id,
+        coalesce(m.next_tier, 1),
+        0
+      from public.profiles p
+      left join moved m
+        on m.user_id = p.id
+      where p.role = 'user'
+        and coalesce(p.disabled, false) = false;
+    end if;
+  end if;
+
+  delete from public.league_memberships lm
+  using public.profiles p
+  where lm.week_id = v_week_id
+    and lm.user_id = p.id
+    and (p.role <> 'user' or coalesce(p.disabled, false) = true);
+
+  insert into public.league_memberships (week_id, user_id, league_tier, weekly_points)
+  select v_week_id, p.id, 1, 0
+  from public.profiles p
+  where p.role = 'user'
+    and coalesce(p.disabled, false) = false
+    and not exists (
+      select 1
+      from public.league_memberships lm
+      where lm.week_id = v_week_id
+        and lm.user_id = p.id
+    );
+
+  with ordered as (
+    select
+      lm.id,
+      lm.league_tier,
+      row_number() over (partition by lm.league_tier order by lm.user_id) as tier_pos
+    from public.league_memberships lm
+    where lm.week_id = v_week_id
+  ),
+  balanced as (
+    select
+      o.id,
+      (o.league_tier + ((o.tier_pos - 1) / v_league_size))::integer as new_tier
+    from ordered o
+  )
+  update public.league_memberships lm
+  set league_tier = b.new_tier
+  from balanced b
+  where lm.id = b.id
+    and lm.league_tier <> b.new_tier;
+
+  if not coalesce(v_enabled, true) then
+    update public.league_memberships
+    set weekly_points = 0, rank = null
+    where week_id = v_week_id;
+
+    return query
+    select
+      v_week_id,
+      v_week_start,
+      v_week_end,
+      coalesce((select count(*) from public.league_memberships lm where lm.week_id = v_week_id), 0)::integer;
+    return;
+  end if;
+
+  with waste_points as (
+    select
+      wt.user_id,
+      sum(wt.points_awarded)::numeric(12,1) as points
+    from public.waste_transactions wt
+    where wt.created_at >= v_week_start::timestamptz
+      and wt.created_at < v_week_end::timestamptz
+    group by wt.user_id
+  ),
+  incoming_points as (
+    select
+      pt.to_id as user_id,
+      sum(pt.points)::numeric(12,1) as points
+    from public.point_transfers pt
+    join public.profiles p_to
+      on p_to.id = pt.to_id
+    where p_to.role = 'user'
+      and pt.created_at >= v_week_start::timestamptz
+      and pt.created_at < v_week_end::timestamptz
+    group by pt.to_id
+  ),
+  total_points as (
+    select
+      p.id as user_id,
+      (coalesce(w.points, 0) + coalesce(i.points, 0))::numeric(12,1) as weekly_points
+    from public.profiles p
+    left join waste_points w
+      on w.user_id = p.id
+    left join incoming_points i
+      on i.user_id = p.id
+    where p.role = 'user'
+      and coalesce(p.disabled, false) = false
+  )
+  update public.league_memberships lm
+  set weekly_points = coalesce(tp.weekly_points, 0)
+  from total_points tp
+  where lm.week_id = v_week_id
+    and lm.user_id = tp.user_id;
+
+  with ranked as (
+    select
+      lm.id,
+      row_number() over (
+        partition by lm.league_tier
+        order by lm.weekly_points desc, p.created_at asc, lm.user_id
+      ) as new_rank
+    from public.league_memberships lm
+    join public.profiles p
+      on p.id = lm.user_id
+    where lm.week_id = v_week_id
+  )
+  update public.league_memberships lm
+  set rank = ranked.new_rank
+  from ranked
+  where lm.id = ranked.id;
+
+  return query
+  select
+    v_week_id,
+    v_week_start,
+    v_week_end,
+    coalesce((select count(*) from public.league_memberships lm where lm.week_id = v_week_id), 0)::integer;
+end;
+$$;
+
+create or replace function public.admin_update_league_settings(
+  p_league_size integer,
+  p_promote_count integer,
+  p_demote_count integer,
+  p_enabled boolean default true
+)
+returns table(
+  league_size integer,
+  promote_count integer,
+  demote_count integer,
+  enabled boolean,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_admin_role text;
+begin
+  if v_admin_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select pr.role into v_admin_role
+  from public.profiles pr
+  where pr.id = v_admin_id;
+
+  if v_admin_role <> 'admin' then
+    raise exception 'Only admin can update league settings';
+  end if;
+
+  if p_league_size is null or p_league_size < 5 then
+    raise exception 'League size must be >= 5';
+  end if;
+
+  if p_promote_count is null or p_promote_count < 0 then
+    raise exception 'Promote count must be >= 0';
+  end if;
+
+  if p_demote_count is null or p_demote_count < 0 then
+    raise exception 'Demote count must be >= 0';
+  end if;
+
+  if p_promote_count + p_demote_count >= p_league_size then
+    raise exception 'Promote + demote must be less than league size';
+  end if;
+
+  insert into public.league_settings (
+    id,
+    league_size,
+    promote_count,
+    demote_count,
+    enabled,
+    updated_by,
+    updated_at
+  )
+  values (
+    1,
+    p_league_size,
+    p_promote_count,
+    p_demote_count,
+    coalesce(p_enabled, true),
+    v_admin_id,
+    now()
+  )
+  on conflict (id) do update
+  set
+    league_size = excluded.league_size,
+    promote_count = excluded.promote_count,
+    demote_count = excluded.demote_count,
+    enabled = excluded.enabled,
+    updated_by = excluded.updated_by,
+    updated_at = excluded.updated_at;
+
+  perform public.league_refresh_current_scores();
+
+  return query
+  select
+    ls.league_size,
+    ls.promote_count,
+    ls.demote_count,
+    ls.enabled,
+    ls.updated_at
+  from public.league_settings ls
+  where ls.id = 1;
+end;
+$$;
+
+create or replace function public.admin_close_league_week(
+  p_start_next_week boolean default true
+)
+returns table(
+  closed_week_id uuid,
+  closed_week_start date,
+  closed_week_end date,
+  next_week_start date,
+  next_week_end date
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_admin_role text;
+  v_open public.league_weeks%rowtype;
+  v_next_start date;
+  v_next_end date;
+begin
+  if v_admin_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select pr.role into v_admin_role
+  from public.profiles pr
+  where pr.id = v_admin_id;
+
+  if v_admin_role <> 'admin' then
+    raise exception 'Only admin can close league week';
+  end if;
+
+  perform public.league_refresh_current_scores();
+
+  select lw.*
+  into v_open
+  from public.league_weeks lw
+  where lw.status = 'open'
+  order by lw.week_start desc
+  limit 1
+  for update;
+
+  if v_open.id is null then
+    raise exception 'No open league week found';
+  end if;
+
+  update public.league_weeks
+  set
+    status = 'closed',
+    closed_by_admin_id = v_admin_id,
+    closed_at = now()
+  where id = v_open.id;
+
+  if coalesce(p_start_next_week, true) then
+    v_next_start := v_open.week_end;
+    v_next_end := (v_next_start + 7);
+
+    insert into public.league_weeks (week_start, week_end, status)
+    values (v_next_start, v_next_end, 'open')
+    on conflict (week_start) do update
+    set
+      week_end = excluded.week_end,
+      status = 'open',
+      closed_by_admin_id = null,
+      closed_at = null;
+  end if;
+
+  perform public.league_refresh_current_scores();
+
+  return query
+  select
+    v_open.id,
+    v_open.week_start,
+    v_open.week_end,
+    v_next_start,
+    v_next_end;
+end;
+$$;
+
+create or replace function public.get_user_league_snapshot()
+returns table(
+  week_start date,
+  week_end date,
+  league_tier integer,
+  league_name text,
+  profile_id uuid,
+  profile_name text,
+  weekly_points numeric,
+  rank integer,
+  is_me boolean
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+declare
+  v_user_id uuid := auth.uid();
+  v_user_role text;
+  v_week_id uuid;
+  v_tier integer;
+begin
+  if v_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select p.role into v_user_role
+  from public.profiles p
+  where p.id = v_user_id;
+
+  if v_user_role <> 'user' then
+    raise exception 'Only users can view league snapshot';
+  end if;
+
+  perform public.league_refresh_current_scores();
+
+  select lm.week_id, lm.league_tier
+  into v_week_id, v_tier
+  from public.league_memberships lm
+  join public.league_weeks lw
+    on lw.id = lm.week_id
+  where lw.status = 'open'
+    and lm.user_id = v_user_id
+  order by lw.week_start desc
+  limit 1;
+
+  if v_week_id is null then
+    return;
+  end if;
+
+  return query
+  select
+    lw.week_start,
+    lw.week_end,
+    lm.league_tier,
+    public.league_tier_name(lm.league_tier),
+    lm.user_id,
+    coalesce(p.name, p.phone, 'User'),
+    lm.weekly_points,
+    lm.rank,
+    (lm.user_id = v_user_id) as is_me
+  from public.league_memberships lm
+  join public.league_weeks lw
+    on lw.id = lm.week_id
+  join public.profiles p
+    on p.id = lm.user_id
+  where lm.week_id = v_week_id
+    and lm.league_tier = v_tier
+  order by lm.rank asc nulls last, lm.weekly_points desc, p.created_at asc;
+end;
+$$;
+
+create or replace function public.admin_get_league_week_rows()
+returns table(
+  week_id uuid,
+  week_start date,
+  week_end date,
+  league_tier integer,
+  league_name text,
+  profile_id uuid,
+  profile_name text,
+  profile_phone text,
+  weekly_points numeric,
+  rank integer
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+#variable_conflict use_column
+declare
+  v_admin_id uuid := auth.uid();
+  v_admin_role text;
+begin
+  if v_admin_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select p.role into v_admin_role
+  from public.profiles p
+  where p.id = v_admin_id;
+
+  if v_admin_role <> 'admin' then
+    raise exception 'Only admin can view league table';
+  end if;
+
+  perform public.league_refresh_current_scores();
+
+  return query
+  select
+    lw.id,
+    lw.week_start,
+    lw.week_end,
+    lm.league_tier,
+    public.league_tier_name(lm.league_tier),
+    lm.user_id,
+    coalesce(p.name, p.phone, 'User'),
+    p.phone,
+    lm.weekly_points,
+    lm.rank
+  from public.league_memberships lm
+  join public.league_weeks lw
+    on lw.id = lm.week_id
+  join public.profiles p
+    on p.id = lm.user_id
+  where lw.status = 'open'
+  order by lm.league_tier asc, lm.rank asc nulls last, lm.weekly_points desc, p.created_at asc;
+end;
+$$;
+
 drop function if exists public.admin_upsert_store_profile(text, text, text, text, boolean);
 grant execute on function public.admin_upsert_store_profile(text, text, text, text, boolean, text) to authenticated;
 grant execute on function public.admin_adjust_waste_transaction(uuid, numeric, integer) to authenticated;
 grant execute on function public.admin_delete_waste_transaction(uuid) to authenticated;
 grant execute on function public.admin_delete_store_profile(uuid) to authenticated;
+grant execute on function public.admin_set_cash_rates(numeric, numeric) to authenticated;
+grant execute on function public.admin_settle_profile_points(uuid, text) to authenticated;
+grant execute on function public.league_tier_name(integer) to authenticated;
+grant execute on function public.ensure_current_league_week() to authenticated;
+grant execute on function public.league_refresh_current_scores() to authenticated;
+grant execute on function public.admin_update_league_settings(integer, integer, integer, boolean) to authenticated;
+grant execute on function public.admin_close_league_week(boolean) to authenticated;
+grant execute on function public.get_user_league_snapshot() to authenticated;
+grant execute on function public.admin_get_league_week_rows() to authenticated;

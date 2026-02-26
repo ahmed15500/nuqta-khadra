@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import AppUpdateNotice from "./components/AppUpdateNotice";
+import IncomingTransferNotice from "./components/IncomingTransferNotice";
+import UserBottomDock from "./components/UserBottomDock";
 import { useAuth } from "./contexts/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -13,6 +15,8 @@ import AdminHome from "./pages/admin/AdminHome";
 import ManagePrices from "./pages/admin/ManagePrices";
 import ManageStores from "./pages/admin/ManageStores";
 import ManageTransactions from "./pages/admin/ManageTransactions";
+import ManageSettlements from "./pages/admin/ManageSettlements";
+import ManageLeagues from "./pages/admin/ManageLeagues";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { roles } from "./lib/supabase";
 
@@ -91,12 +95,17 @@ function StateScreen({ title, subtitle, action = null }) {
 }
 
 export default function App() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const showNavbar = session;
+  const showBottomDock = Boolean(
+    session &&
+      [roles.USER, roles.PARTNER, roles.COLLECTOR, roles.ADMIN].includes(profile?.role)
+  );
 
   return (
-    <>
+    <div className={`app-shell ${showBottomDock ? "with-bottom-dock" : ""}`}>
       {showNavbar ? <Navbar /> : null}
+      {showNavbar ? <IncomingTransferNotice /> : null}
       <AppUpdateNotice />
       <Routes>
         <Route path="/" element={<RootRedirect />} />
@@ -178,9 +187,26 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin/settlements"
+          element={
+            <ProtectedRoute allowedRoles={[roles.ADMIN]}>
+              <ManageSettlements />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/leagues"
+          element={
+            <ProtectedRoute allowedRoles={[roles.ADMIN]}>
+              <ManageLeagues />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
+      {showBottomDock ? <UserBottomDock /> : null}
+    </div>
   );
 }

@@ -19,13 +19,15 @@ const roleLinks = {
     { to: "/admin", label: "لوحة التحكم" },
     { to: "/admin/prices", label: "إدارة الأسعار" },
     { to: "/admin/stores", label: "إدارة المحلات" },
-    { to: "/admin/transactions", label: "إدارة المعاملات" }
+    { to: "/admin/transactions", label: "إدارة المعاملات" },
+    { to: "/admin/leagues", label: "الدوريات الأسبوعية" },
+    { to: "/admin/settlements", label: "التسويات المالية" }
   ]
 };
 
 const roleLabel = {
   [roles.USER]: "مستخدم",
-  [roles.COLLECTOR]: "محل جمع",
+  [roles.COLLECTOR]: "محل تجميع",
   [roles.PARTNER]: "محل شريك",
   [roles.ADMIN]: "مشرف"
 };
@@ -33,7 +35,9 @@ const roleLabel = {
 export default function Navbar() {
   const { profile, logout } = useAuth();
   const navigate = useNavigate();
-  const links = roleLinks[profile?.role] || [];
+  const usesBottomDock = [roles.USER, roles.PARTNER, roles.COLLECTOR, roles.ADMIN].includes(profile?.role);
+  const isUserRole = profile?.role === roles.USER;
+  const links = usesBottomDock ? [] : roleLinks[profile?.role] || [];
 
   const onLogout = async () => {
     try {
@@ -44,40 +48,55 @@ export default function Navbar() {
   };
 
   return (
-    <header className="navbar">
+    <header className={`navbar ${isUserRole ? "navbar-user" : ""}`}>
       <div className="brand">نقطة خضراء</div>
-      <nav>
-        {links.map((link) => (
-          <NavLink key={link.to} to={link.to} className="nav-link">
-            {link.label}
-          </NavLink>
-        ))}
-      </nav>
+
+      {links.length ? (
+        <nav>
+          {links.map((link) => (
+            <NavLink key={link.to} to={link.to} className="nav-link">
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+      ) : null}
+
+      {isUserRole ? (
+        <div className="navbar-center-points">
+          <PointsBadge points={profile?.points || 0} className="badge-prominent" />
+        </div>
+      ) : null}
+
       <div className="nav-actions">
-        <a className="powered-by powered-by-nav" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
-          <img
-            src={rdcLogoUrl}
-            alt="Rural Development Center - Heliopolis University"
-            className="powered-logo"
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-          <span className="powered-copy">
-            <small>Powered by</small>
-            <strong>RDC - HU</strong>
-          </span>
-        </a>
+        {!isUserRole ? (
+          <a className="powered-by powered-by-nav" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
+            <img
+              src={rdcLogoUrl}
+              alt="Rural Development Center - Heliopolis University"
+              className="powered-logo"
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+            <span className="powered-copy">
+              <small>Powered by</small>
+              <strong>RDC - HU</strong>
+            </span>
+          </a>
+        ) : null}
 
         <div className="account-mini">
           <strong>{profile?.store_name || profile?.name || "بدون اسم"}</strong>
           <small>{roleLabel[profile?.role] || "-"}</small>
         </div>
-        <PointsBadge points={profile?.points || 0} />
-        <button className="btn btn-outline" onClick={onLogout}>
-          خروج
-        </button>
+        {!isUserRole ? <PointsBadge points={profile?.points || 0} /> : null}
+
+        {!usesBottomDock ? (
+          <button className="btn btn-outline" onClick={onLogout}>
+            خروج
+          </button>
+        ) : null}
       </div>
     </header>
   );

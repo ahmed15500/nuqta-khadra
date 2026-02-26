@@ -1,128 +1,79 @@
-name: Build Signed APK And Attach To Release
+name: Release APK
 
 on:
-  release:
-    types: [published]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version name (example: 1.2.0)"
-        required: false
+  push:
+    tags:
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  android-apk:
+  release:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: gradle
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Resolve release metadata
-        id: meta
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "release" ]]; then
-            TAG="${{ github.event.release.tag_name }}"
-          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
-            TAG="v${{ github.event.inputs.version }}"
-          else
-            TAG="v0.0.${{ github.run_number }}"
-          fi
-          VERSION_NAME="${TAG#v}"
-          VERSION_CODE="${{ github.run_number }}"
-
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
-          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate required secrets
+      - name: Build web
+        run: npm run build --if-present
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          test -n "$VITE_SUPABASE_URL" || (echo "Missing secret: VITE_SUPABASE_URL" && exit 1)
-          test -n "$VITE_SUPABASE_ANON_KEY" || (echo "Missing secret: VITE_SUPABASE_ANON_KEY" && exit 1)
-          test -n "$ANDROID_KEYSTORE_BASE64" || (echo "Missing secret: ANDROID_KEYSTORE_BASE64" && exit 1)
-          test -n "$ANDROID_KEYSTORE_PASSWORD" || (echo "Missing secret: ANDROID_KEYSTORE_PASSWORD" && exit 1)
-          test -n "$ANDROID_KEY_ALIAS" || (echo "Missing secret: ANDROID_KEY_ALIAS" && exit 1)
-          test -n "$ANDROID_KEY_PASSWORD" || (echo "Missing secret: ANDROID_KEY_PASSWORD" && exit 1)
 
-      - name: Build web assets
-        run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_GITHUB_REPO: ${{ github.repository }}
-          VITE_APP_VERSION: ${{ steps.meta.outputs.version_name }}
-
-      - name: Sync Capacitor Android
+      - name: Capacitor sync android
         run: npx cap sync android
 
-      - name: Prepare Android signing files
-        shell: bash
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      # Signed release if secrets exist, otherwise fallback to debug
+      - name: Decode keystore (optional)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build Release APK (signed)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/release.keystore
-          cat > android/keystore.properties <<EOF
-          storeFile=release.keystore
-          storePassword=$ANDROID_KEYSTORE_PASSWORD
-          keyAlias=$ANDROID_KEY_ALIAS
-          keyPassword=$ANDROID_KEY_PASSWORD
-          EOF
 
-      - name: Build signed release APK
+      - name: Build Debug APK (fallback)
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
         run: |
-          chmod +x android/gradlew
           cd android
-          ./gradlew --no-daemon assembleRelease \
-            -PappVersionCode=${{ steps.meta.outputs.version_code }} \
-            -PappVersionName=${{ steps.meta.outputs.version_name }}
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-      - name: Prepare APK artifact
-        shell: bash
+      - name: Prepare APK file
         run: |
-          TAG="${{ steps.meta.outputs.tag }}"
-          mkdir -p release-assets
-          cp android/app/build/outputs/apk/release/app-release.apk "release-assets/nuqta-khadra-${TAG}.apk"
+          mkdir -p release
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk "release/nuqta-khadra-${{ github.ref_name }}.apk"
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk "release/nuqta-khadra-${{ github.ref_name }}.apk"
+          fi
 
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-signed-apk
-          path: release-assets/*.apk
-
-      - name: Upload APK to GitHub Release
-        if: github.event_name == 'release'
+      - name: Create GitHub Release and upload APK
         uses: softprops/action-gh-release@v2
         with:
-          files: release-assets/*.apk
+          files: release/*.apk

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { roles, supabase } from "../../lib/supabase";
 
-async function loadPartnersWithOptionalPhoto() {
+async function loadTransferStoresWithOptionalPhoto() {
   const withPhoto = await supabase
     .from("profiles")
     .select("id, name, store_name, phone, role, disabled, photo_url")
-    .eq("role", roles.PARTNER)
+    .in("role", [roles.PARTNER, roles.COLLECTOR])
     .eq("disabled", false)
     .order("store_name", { ascending: true });
 
@@ -20,7 +20,7 @@ async function loadPartnersWithOptionalPhoto() {
   const fallback = await supabase
     .from("profiles")
     .select("id, name, store_name, phone, role, disabled")
-    .eq("role", roles.PARTNER)
+    .in("role", [roles.PARTNER, roles.COLLECTOR])
     .eq("disabled", false)
     .order("store_name", { ascending: true });
 
@@ -58,14 +58,20 @@ const formatPoints = (value) => {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 };
 
+const storeRoleLabel = (role) => {
+  if (role === roles.PARTNER) return "محل شريك";
+  if (role === roles.COLLECTOR) return "محل تجميع";
+  return "محل";
+};
+
 export default function Transfer() {
   const { profile, refreshProfile } = useAuth();
   const [mode, setMode] = useState("user");
   const [phone, setPhone] = useState("");
-  const [partnerId, setPartnerId] = useState("");
+  const [storeId, setStoreId] = useState("");
   const [points, setPoints] = useState("");
-  const [partners, setPartners] = useState([]);
-  const [loadingPartners, setLoadingPartners] = useState(false);
+  const [stores, setStores] = useState([]);
+  const [loadingStores, setLoadingStores] = useState(false);
   const [searchingUser, setSearchingUser] = useState(false);
   const [targetUser, setTargetUser] = useState(null);
   const [msg, setMsg] = useState("");
@@ -73,24 +79,26 @@ export default function Transfer() {
 
   useEffect(() => {
     const run = async () => {
-      setLoadingPartners(true);
-      const list = await loadPartnersWithOptionalPhoto();
-      setPartners(list);
-      setLoadingPartners(false);
+      setLoadingStores(true);
+      const list = await loadTransferStoresWithOptionalPhoto();
+      setStores(list);
+      setLoadingStores(false);
     };
     run();
   }, []);
 
-  const selectedPartner = useMemo(
-    () => partners.find((p) => p.id === partnerId) || null,
-    [partners, partnerId]
-  );
-  const selectedTarget = mode === "user" ? targetUser : selectedPartner;
+  const selectedStore = useMemo(() => stores.find((p) => p.id === storeId) || null, [stores, storeId]);
+  const selectedTarget = mode === "user" ? targetUser : selectedStore;
+  const summary = useMemo(() => {
+    const partnerCount = stores.filter((x) => x.role === roles.PARTNER).length;
+    const collectorCount = stores.filter((x) => x.role === roles.COLLECTOR).length;
+    return { partnerCount, collectorCount, total: stores.length };
+  }, [stores]);
 
   const switchMode = (nextMode) => {
     setMode(nextMode);
     setPhone("");
-    setPartnerId("");
+    setStoreId("");
     setTargetUser(null);
     setPoints("");
     setMsg("");
@@ -161,9 +169,9 @@ export default function Transfer() {
         target = targetUser;
         transferType = "user_to_user";
       } else {
-        if (!partnerId) return setError("اختر المحل الشريك أولاً.");
-        target = selectedPartner;
-        if (!target) return setError("المحل الشريك غير متاح حالياً.");
+        if (!storeId) return setError("اختر المحل أولاً.");
+        target = selectedStore;
+        if (!target) return setError("المحل غير متاح حالياً.");
         transferType = "user_to_store";
       }
 
@@ -182,7 +190,7 @@ export default function Transfer() {
       setPoints("");
       setPhone("");
       setTargetUser(null);
-      setPartnerId("");
+      setStoreId("");
     } catch (err) {
       setError(err?.message || "حدث خطأ غير متوقع أثناء التحويل.");
     }
@@ -202,17 +210,19 @@ export default function Transfer() {
         </button>
         <button
           type="button"
-          className={`btn ${mode === "partner" ? "" : "btn-outline"}`}
-          onClick={() => switchMode("partner")}
+          className={`btn ${mode === "store" ? "" : "btn-outline"}`}
+          onClick={() => switchMode("store")}
         >
-          إلى محل شريك
+          إلى محل
         </button>
       </div>
 
       <div className="card">
         <h3>رؤية سريعة</h3>
         <p className="muted">رصيدك الحالي: {formatPoints(profile?.points)} نقطة</p>
-        <p className="muted">عدد المحلات الشريكة المتاحة: {partners.length}</p>
+        <p className="muted">
+          المحلات المتاحة: {summary.total} (شريك: {summary.partnerCount} | تجميع: {summary.collectorCount})
+        </p>
       </div>
 
       <form className="card" onSubmit={submit} noValidate>
@@ -248,20 +258,20 @@ export default function Transfer() {
           </>
         ) : (
           <label>
-            اختر المحل الشريك
+            اختر المحل (شريك أو تجميع)
             <select
-              value={partnerId}
+              value={storeId}
               onChange={(e) => {
-                setPartnerId(e.target.value);
+                setStoreId(e.target.value);
                 setMsg("");
                 setError("");
               }}
               required
             >
               <option value="">اختر محلاً...</option>
-              {partners.map((p) => (
+              {stores.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.store_name || p.name} - {p.phone}
+                  [{storeRoleLabel(p.role)}] {p.store_name || p.name} - {p.phone}
                 </option>
               ))}
             </select>
@@ -275,6 +285,7 @@ export default function Transfer() {
               {selectedTarget.store_name || selectedTarget.name || "-"}
             </p>
             <p className="muted">الهاتف: {selectedTarget.phone || "-"}</p>
+            {selectedTarget.role ? <p className="muted">النوع: {storeRoleLabel(selectedTarget.role)}</p> : null}
           </div>
         ) : (
           <p className="muted" style={{ marginTop: 8, marginBottom: 8 }}>
@@ -306,12 +317,12 @@ export default function Transfer() {
         </button>
       </form>
 
-      {mode === "partner" ? (
+      {mode === "store" ? (
         <div className="card">
-          <h3>المحلات الشريكة</h3>
-          {loadingPartners ? <p className="muted">جاري تحميل قائمة المحلات...</p> : null}
+          <h3>المحلات المتاحة</h3>
+          {loadingStores ? <p className="muted">جاري تحميل قائمة المحلات...</p> : null}
           <div className="shops-grid">
-            {partners.map((shop) => (
+            {stores.map((shop) => (
               <article className="shop-item" key={shop.id}>
                 <img
                   src={shop.photo_url || "/icons/icon-192.svg"}
@@ -325,13 +336,12 @@ export default function Transfer() {
                 <div>
                   <h4>{shop.store_name || shop.name || "-"}</h4>
                   <p className="muted">{shop.phone || "-"}</p>
+                  <p className="muted">{storeRoleLabel(shop.role)}</p>
                 </div>
               </article>
             ))}
           </div>
-          {!partners.length && !loadingPartners ? (
-            <p className="muted">لا توجد محلات شريكة متاحة حالياً.</p>
-          ) : null}
+          {!stores.length && !loadingStores ? <p className="muted">لا توجد محلات متاحة حالياً.</p> : null}
         </div>
       ) : null}
     </section>

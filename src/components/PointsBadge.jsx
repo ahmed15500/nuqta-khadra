@@ -4,6 +4,12 @@ function formatPoints(value) {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
-export default function PointsBadge({ points }) {
-  return <span className="badge">{formatPoints(points)} نقطة</span>;
+export default function PointsBadge({ points, className = "" }) {
+  const cssClass = `badge ${className}`.trim();
+  return (
+    <span className={cssClass}>
+      <span aria-hidden="true">★</span>
+      <span>{formatPoints(points)} نقطة</span>
+    </span>
+  );
 }
