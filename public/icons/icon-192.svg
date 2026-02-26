@@ -1,5 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0f4d32"/>
-  <circle cx="256" cy="256" r="180" fill="#d6ad60"/>
-  <path d="M150 290c70-10 115-55 130-130 55 35 90 95 82 152-9 68-69 120-140 120-77 0-140-63-140-140 0-55 32-102 78-126-10 65-12 99-10 124z" fill="#0f4d32"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b3f32" />
+      <stop offset="100%" stop-color="#2c8a63" />
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.28)" />
+      <stop offset="70%" stop-color="rgba(255,255,255,0)" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)" />
+  <rect width="512" height="250" rx="112" fill="url(#shine)" />
+  <circle cx="256" cy="256" r="160" fill="#d6ad60" />
+  <path
+    d="M138 298C173 197 250 196 281 256C250 333 191 345 138 298Z"
+    fill="#0f4d32"
+    transform="rotate(-34 256 256)"
+  />
+  <path
+    d="M191 311L310 212"
+    stroke="#ffffff"
+    stroke-width="20"
+    stroke-linecap="round"
+  />
+  <circle cx="242" cy="286" r="20" fill="#ffffff" />
 </svg>
