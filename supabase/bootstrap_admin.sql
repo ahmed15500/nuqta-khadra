@@ -1,0 +1,27 @@
+-- Create or promote an existing auth user to admin profile.
+-- Replace values before running.
+
+-- 1) Ensure auth user exists (create from Supabase Dashboard -> Authentication -> Users)
+--    Example email format used by app: PHONE@nuqta.app
+--    Example: 01000000004@nuqta.app
+
+-- 2) Upsert admin profile mapped to auth.users.id
+insert into public.profiles (id, name, phone, role, points, store_name, disabled)
+select
+  u.id,
+  'System Admin',
+  '01000000004',
+  'admin',
+  0,
+  null,
+  false
+from auth.users u
+where lower(u.email) = lower('01000000004@nuqta.app')
+on conflict (id) do update
+set
+  name = excluded.name,
+  phone = excluded.phone,
+  role = excluded.role,
+  points = excluded.points,
+  store_name = excluded.store_name,
+  disabled = excluded.disabled;

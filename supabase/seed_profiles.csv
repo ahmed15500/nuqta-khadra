@@ -1,0 +1,5 @@
+email,phone,name,role,store_name,points
+01000000001@nuqta.app,01000000001,مستخدم تجريبي,user,,120
+01000000002@nuqta.app,01000000002,محل جمع 1,collector_store,Green Collector,0
+01000000003@nuqta.app,01000000003,محل شريك 1,partner_store,Green Partner,0
+01000000004@nuqta.app,01000000004,Admin,admin,,0

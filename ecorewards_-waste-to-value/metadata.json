@@ -1,0 +1,5 @@
+{
+  "name": "EcoRewards: Waste-to-Value",
+  "description": "A loyalty program platform where citizens earn points for recycling waste, redeemable at partner retail stores.",
+  "requestFramePermissions": ["geolocation"]
+}

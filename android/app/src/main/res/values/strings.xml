@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nuqta Khadra</string>
+    <string name="title_activity_main">Nuqta Khadra</string>
+    <string name="package_name">com.nuqta.khadra</string>
+    <string name="custom_url_scheme">com.nuqta.khadra</string>
+</resources>

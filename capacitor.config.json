@@ -1,0 +1,6 @@
+{
+  "appId": "com.nuqta.khadra",
+  "appName": "Nuqta Khadra",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
