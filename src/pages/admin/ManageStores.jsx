@@ -251,11 +251,11 @@ export default function ManageStores() {
       </div>
 
       <div className="grid-2">
-        <div className="card">
+        <div className="card shops-points-card shops-points-card-collector">
           <h3>محلات التجميع</h3>
           <p className="big">{summary.collectors}</p>
         </div>
-        <div className="card">
+        <div className="card shops-points-card shops-points-card-partner">
           <h3>المحلات الشريكة</h3>
           <p className="big">{summary.partners}</p>
         </div>
