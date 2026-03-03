@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
+const rdcLogoFallback = "/icons/icon-192.svg";
 
 export default function Register() {
   const { register } = useAuth();
@@ -38,10 +39,11 @@ export default function Register() {
             className="powered-logo"
             loading="lazy"
             onError={(e) => {
-              e.currentTarget.style.display = "none";
+              if (e.currentTarget.src.endsWith(rdcLogoFallback)) return;
+              e.currentTarget.src = rdcLogoFallback;
             }}
           />
-          <span className="powered-copy">
+          <span className="powered-copy powered-copy-en" lang="en" dir="ltr">
             <small>Powered by</small>
             <strong>Rural Development Center - Heliopolis University</strong>
           </span>

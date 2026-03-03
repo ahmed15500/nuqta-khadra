@@ -7,12 +7,14 @@ create table if not exists public.profiles (
   role text not null check (role in ('collector_store','user','partner_store','admin')),
   points numeric(12,1) not null default 0,
   store_name text,
+  store_category text not null default 'other_services',
   photo_url text,
   disabled boolean not null default false,
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles add column if not exists photo_url text;
+alter table public.profiles add column if not exists store_category text not null default 'other_services';
 
 -- Existing deployments may already have policies referencing profiles.points.
 -- Drop those policies first so column type migration can succeed.
@@ -574,11 +576,12 @@ create or replace function public.admin_upsert_store_profile(
   p_phone text,
   p_name text,
   p_store_name text,
+  p_store_category text,
   p_role text,
   p_disabled boolean default false,
   p_photo_url text default null
 )
-returns table(profile_id uuid, role text, store_name text, photo_url text)
+returns table(profile_id uuid, role text, store_name text, store_category text, photo_url text)
 language plpgsql
 security definer
 set search_path = public, auth
@@ -614,6 +617,10 @@ begin
     raise exception 'Role must be collector_store or partner_store';
   end if;
 
+  if coalesce(trim(p_store_category), '') = '' then
+    p_store_category := 'other_services';
+  end if;
+
   v_email := lower(v_phone || '@nuqta.app');
 
   select u.id into v_user_id
@@ -625,19 +632,20 @@ begin
     raise exception 'No auth account found for this phone. Ask the store owner to register first.';
   end if;
 
-  insert into public.profiles (id, name, phone, role, points, store_name, photo_url, disabled)
-  values (v_user_id, trim(p_name), v_phone, p_role, 0, trim(p_store_name), nullif(trim(coalesce(p_photo_url, '')), ''), coalesce(p_disabled, false))
+  insert into public.profiles (id, name, phone, role, points, store_name, store_category, photo_url, disabled)
+  values (v_user_id, trim(p_name), v_phone, p_role, 0, trim(p_store_name), p_store_category, nullif(trim(coalesce(p_photo_url, '')), ''), coalesce(p_disabled, false))
   on conflict (id) do update
   set
     name = excluded.name,
     phone = excluded.phone,
     role = excluded.role,
     store_name = excluded.store_name,
+    store_category = excluded.store_category,
     photo_url = excluded.photo_url,
     disabled = excluded.disabled;
 
   return query
-  select p.id, p.role, p.store_name, p.photo_url
+  select p.id, p.role, p.store_name, p.store_category, p.photo_url
   from public.profiles p
   where p.id = v_user_id;
 end;
@@ -1431,7 +1439,8 @@ end;
 $$;
 
 drop function if exists public.admin_upsert_store_profile(text, text, text, text, boolean);
-grant execute on function public.admin_upsert_store_profile(text, text, text, text, boolean, text) to authenticated;
+drop function if exists public.admin_upsert_store_profile(text, text, text, text, boolean, text);
+grant execute on function public.admin_upsert_store_profile(text, text, text, text, text, boolean, text) to authenticated;
 grant execute on function public.admin_adjust_waste_transaction(uuid, numeric, integer) to authenticated;
 grant execute on function public.admin_delete_waste_transaction(uuid) to authenticated;
 grant execute on function public.admin_delete_store_profile(uuid) to authenticated;

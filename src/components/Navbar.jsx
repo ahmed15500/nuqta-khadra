@@ -4,6 +4,7 @@ import PointsBadge from "./PointsBadge";
 import { roles } from "../lib/supabase";
 
 const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
+const rdcLogoFallback = "/icons/icon-192.svg";
 
 const roleLinks = {
   [roles.COLLECTOR]: [
@@ -76,12 +77,13 @@ export default function Navbar() {
               className="powered-logo"
               loading="lazy"
               onError={(e) => {
-                e.currentTarget.style.display = "none";
+                if (e.currentTarget.src.endsWith(rdcLogoFallback)) return;
+                e.currentTarget.src = rdcLogoFallback;
               }}
             />
-            <span className="powered-copy">
+            <span className="powered-copy powered-copy-en" lang="en" dir="ltr">
               <small>Powered by</small>
-              <strong>RDC - HU</strong>
+              <strong>Rural Development Center - Heliopolis University</strong>
             </span>
           </a>
         ) : null}

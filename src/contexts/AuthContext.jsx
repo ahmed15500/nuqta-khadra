@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { supabase, phoneToEmail, supabaseConfigError } from "../lib/supabase";
+﻿import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { supabase, phoneToEmail, identifierToEmail, supabaseConfigError } from "../lib/supabase";
 
 const AuthContext = createContext(null);
 const AUTH_TIMEOUT_MS = 12000;
@@ -56,42 +56,13 @@ export function AuthProvider({ children }) {
     return normalized || null;
   };
 
-  const createDefaultProfileFromAuth = async (authUser) => {
-    const phone = extractPhoneFromEmail(authUser?.email);
-    if (!phone) return null;
-
-    const name = authUser?.user_metadata?.name || "مستخدم جديد";
-
-    const payload = {
-      id: authUser.id,
-      name,
-      phone,
-      role: "user",
-      store_name: null,
-      points: 0,
-      disabled: false
-    };
-
-    const { data, error } = await supabase
-      .from("profiles")
-      .upsert(payload, { onConflict: "id" })
-      .select("*")
-      .single();
-
-    if (error) throw error;
-    return data;
-  };
-
   const ensureProfile = async (nextSession) => {
     if (!nextSession?.user?.id) return null;
 
     const existing = await fetchProfile(nextSession.user.id);
     if (existing) return existing;
 
-    const created = await createDefaultProfileFromAuth(nextSession.user);
-    if (created) return created;
-
-    throw new Error("لا يوجد ملف حساب مرتبط بهذا المستخدم. أضف سجلًا في جدول profiles بنفس معرّف المستخدم.");
+    const phone = extractPhoneFromEmail(nextSession.user?.email) || "-"; throw new Error(`لا يوجد ملف حساب مرتبط بهذا الرقم (${phone}). راجع الإدارة لتعيين الدور الصحيح في profiles.`);
   };
 
   const syncAuthState = async () => {
@@ -111,7 +82,7 @@ export function AuthProvider({ children }) {
       const { data, error } = await withTimeout(
         supabase.auth.getSession(),
         AUTH_TIMEOUT_MS,
-        "انتهت مهلة التحقق من الجلسة. حاول مرة أخرى."
+        "Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© Ø§Ù„ØªØ­Ù‚Ù‚ Ù…Ù† Ø§Ù„Ø¬Ù„Ø³Ø©. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰."
       );
       if (error) throw error;
 
@@ -121,7 +92,7 @@ export function AuthProvider({ children }) {
         const p = await withTimeout(
           ensureProfile(data.session),
           AUTH_TIMEOUT_MS,
-          "انتهت مهلة تحميل بيانات الحساب. حاول مرة أخرى."
+          "Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰."
         );
         setProfile(p);
       } else {
@@ -133,7 +104,7 @@ export function AuthProvider({ children }) {
       if (hasUsableState) {
         setAuthError("");
       } else {
-        setAuthError(err?.message || "تعذر تحميل بيانات الحساب من Supabase.");
+        setAuthError(err?.message || "ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨ Ù…Ù† Supabase.");
       }
     } finally {
       setLoading(false);
@@ -146,7 +117,7 @@ export function AuthProvider({ children }) {
       const data = await withTimeout(
         ensureProfile(session),
         AUTH_TIMEOUT_MS,
-        "انتهت مهلة تحديث بيانات الحساب. حاول مرة أخرى."
+        "Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰."
       );
       setProfile(data);
       setAuthError("");
@@ -155,7 +126,7 @@ export function AuthProvider({ children }) {
       if (hasUsableState) {
         setAuthError("");
       } else {
-        setAuthError(err?.message || "تعذر تحديث بيانات الحساب.");
+        setAuthError(err?.message || "ØªØ¹Ø°Ø± ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨.");
       }
     }
   };
@@ -179,7 +150,7 @@ export function AuthProvider({ children }) {
           withTimeout(
             ensureProfile(nextSession),
             AUTH_TIMEOUT_MS,
-            "انتهت مهلة تحديث بيانات الحساب. حاول مرة أخرى."
+            "Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰."
           )
             .then((p) => {
               setProfile(p);
@@ -190,7 +161,7 @@ export function AuthProvider({ children }) {
               if (hasUsableState) {
                 setAuthError("");
               } else {
-                setAuthError(err?.message || "تعذر تحديث بيانات الحساب.");
+                setAuthError(err?.message || "ØªØ¹Ø°Ø± ØªØ­Ø¯ÙŠØ« Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨.");
               }
             });
         } else {
@@ -212,7 +183,7 @@ export function AuthProvider({ children }) {
           const p = await withTimeout(
             ensureProfile(nextSession),
             AUTH_TIMEOUT_MS,
-            "انتهت مهلة تحميل بيانات الحساب. حاول مرة أخرى."
+            "Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨. Ø­Ø§ÙˆÙ„ Ù…Ø±Ø© Ø£Ø®Ø±Ù‰."
           );
           setProfile(p);
           setAuthError("");
@@ -224,7 +195,7 @@ export function AuthProvider({ children }) {
         if (hasUsableState) {
           setAuthError("");
         } else {
-          setAuthError(err?.message || "تعذر تحميل بيانات الحساب من Supabase.");
+          setAuthError(err?.message || "ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø­Ø³Ø§Ø¨ Ù…Ù† Supabase.");
         }
       } finally {
         setLoading(false);
@@ -274,7 +245,7 @@ export function AuthProvider({ children }) {
 
   const login = async ({ phone, password }) => {
     const { error } = await supabase.auth.signInWithPassword({
-      email: phoneToEmail(phone),
+      email: identifierToEmail(phone),
       password
     });
     if (error) throw error;
@@ -322,7 +293,7 @@ export function AuthProvider({ children }) {
       const { error } = await withTimeout(
         supabase.auth.signOut(),
         8000,
-        "انتهت مهلة تسجيل الخروج. سيتم تنظيف الجلسة المحلية."
+        "Ø§Ù†ØªÙ‡Øª Ù…Ù‡Ù„Ø© ØªØ³Ø¬ÙŠÙ„ Ø§Ù„Ø®Ø±ÙˆØ¬. Ø³ÙŠØªÙ… ØªÙ†Ø¸ÙŠÙ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ù…Ø­Ù„ÙŠØ©."
       );
       if (error) throw error;
     } catch (_err) {
@@ -351,3 +322,4 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }
+

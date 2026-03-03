@@ -53,3 +53,11 @@ export const roles = {
 };
 
 export const phoneToEmail = (phone) => `${phone.replace(/[^0-9+]/g, "")}@nuqta.app`;
+export const adminLoginEmail = import.meta.env.VITE_ADMIN_LOGIN_EMAIL || "01000000004@nuqta.app";
+
+export const identifierToEmail = (identifier) => {
+  const raw = String(identifier || "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase() === "admin") return adminLoginEmail;
+  return phoneToEmail(raw);
+};

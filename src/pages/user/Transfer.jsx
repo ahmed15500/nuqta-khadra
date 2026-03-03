@@ -2,19 +2,36 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { roles, supabase } from "../../lib/supabase";
 
+const FALLBACK_CATEGORY = "other_services";
+
+const LEGACY_CATEGORY_LABELS = {
+  grocery: "بقالة",
+  fruits_vegetables: "خضار / فاكهة",
+  stationery: "أدوات مكتبية",
+  pharmacy: "صيدلية",
+  clothing: "ملابس",
+  other_services: "خدمات أخرى"
+};
+
+const normalizeCategory = (value) => String(value || "").trim() || FALLBACK_CATEGORY;
+const categoryLabel = (value) => LEGACY_CATEGORY_LABELS[value] || value || "خدمات أخرى";
+
 async function loadTransferStoresWithOptionalPhoto() {
   const withPhoto = await supabase
     .from("profiles")
-    .select("id, name, store_name, phone, role, disabled, photo_url")
+    .select("id, name, store_name, store_category, phone, role, disabled, photo_url")
     .in("role", [roles.PARTNER, roles.COLLECTOR])
     .eq("disabled", false)
     .order("store_name", { ascending: true });
 
-  if (!withPhoto.error) return withPhoto.data || [];
+  if (!withPhoto.error) {
+    return (withPhoto.data || []).map((p) => ({
+      ...p,
+      store_category: normalizeCategory(p.store_category)
+    }));
+  }
 
-  const maybeMissingColumn = String(withPhoto.error?.message || "")
-    .toLowerCase()
-    .includes("photo_url");
+  const maybeMissingColumn = String(withPhoto.error?.message || "").toLowerCase().match(/photo_url|store_category/);
   if (!maybeMissingColumn) return [];
 
   const fallback = await supabase
@@ -24,7 +41,11 @@ async function loadTransferStoresWithOptionalPhoto() {
     .eq("disabled", false)
     .order("store_name", { ascending: true });
 
-  return (fallback.data || []).map((p) => ({ ...p, photo_url: "" }));
+  return (fallback.data || []).map((p) => ({
+    ...p,
+    photo_url: "",
+    store_category: FALLBACK_CATEGORY
+  }));
 }
 
 const normalizeArabicDigits = (value) =>
@@ -46,8 +67,7 @@ const toValidAmount = (value) => {
   const clean = sanitizePointsInput(value);
   if (!clean) return null;
   const n = Number(clean);
-  if (!Number.isFinite(n)) return null;
-  if (n <= 0) return null;
+  if (!Number.isFinite(n) || n <= 0) return null;
   if (!Number.isInteger(n * 10)) return null;
   return n;
 };
@@ -69,6 +89,7 @@ export default function Transfer() {
   const [mode, setMode] = useState("user");
   const [phone, setPhone] = useState("");
   const [storeId, setStoreId] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
   const [points, setPoints] = useState("");
   const [stores, setStores] = useState([]);
   const [loadingStores, setLoadingStores] = useState(false);
@@ -87,18 +108,36 @@ export default function Transfer() {
     run();
   }, []);
 
+  const categories = useMemo(() => {
+    const set = new Set(stores.map((s) => normalizeCategory(s.store_category)));
+    return Array.from(set).sort((a, b) => categoryLabel(a).localeCompare(categoryLabel(b), "ar"));
+  }, [stores]);
+
+  const filteredStores = useMemo(() => {
+    if (selectedCategory === "all") return stores;
+    return stores.filter((s) => normalizeCategory(s.store_category) === selectedCategory);
+  }, [stores, selectedCategory]);
+
   const selectedStore = useMemo(() => stores.find((p) => p.id === storeId) || null, [stores, storeId]);
   const selectedTarget = mode === "user" ? targetUser : selectedStore;
+
   const summary = useMemo(() => {
     const partnerCount = stores.filter((x) => x.role === roles.PARTNER).length;
     const collectorCount = stores.filter((x) => x.role === roles.COLLECTOR).length;
     return { partnerCount, collectorCount, total: stores.length };
   }, [stores]);
 
+  useEffect(() => {
+    if (!storeId) return;
+    const exists = filteredStores.some((s) => s.id === storeId);
+    if (!exists) setStoreId("");
+  }, [filteredStores, storeId]);
+
   const switchMode = (nextMode) => {
     setMode(nextMode);
     setPhone("");
     setStoreId("");
+    setSelectedCategory("all");
     setTargetUser(null);
     setPoints("");
     setMsg("");
@@ -111,10 +150,7 @@ export default function Transfer() {
     setTargetUser(null);
 
     const normalizedPhone = sanitizePhone(phone);
-    if (!normalizedPhone) {
-      setError("أدخل رقم الهاتف أولاً.");
-      return;
-    }
+    if (!normalizedPhone) return setError("أدخل رقم الهاتف أولًا.");
 
     setSearchingUser(true);
     const { data, error: findErr } = await supabase
@@ -125,20 +161,9 @@ export default function Transfer() {
       .maybeSingle();
     setSearchingUser(false);
 
-    if (findErr) {
-      setError(findErr.message || "تعذر البحث عن المستخدم.");
-      return;
-    }
-
-    if (!data) {
-      setError("لا يوجد مستخدم بهذا الرقم.");
-      return;
-    }
-
-    if (data.id === profile?.id) {
-      setError("لا يمكنك التحويل إلى نفسك.");
-      return;
-    }
+    if (findErr) return setError(findErr.message || "تعذر البحث عن المستخدم.");
+    if (!data) return setError("لا يوجد مستخدم بهذا الرقم.");
+    if (data.id === profile?.id) return setError("لا يمكنك التحويل إلى نفسك.");
 
     setTargetUser(data);
   };
@@ -150,28 +175,21 @@ export default function Transfer() {
 
     try {
       const amount = toValidAmount(points);
-      if (amount === null) {
-        return setError("أدخل عدد نقاط صحيح (مثل: 0.1 أو 1.5).");
-      }
+      if (amount === null) return setError("أدخل عدد نقاط صحيح (مثل: 0.1 أو 1.5).");
 
       const currentBalance = Number(profile?.points || 0);
-      if (amount > currentBalance) {
-        return setError("لا يمكنك تحويل نقاط أكثر من رصيدك الحالي.");
-      }
+      if (amount > currentBalance) return setError("لا يمكنك تحويل نقاط أكثر من رصيدك الحالي.");
 
       let target = null;
       let transferType = "user_to_user";
 
       if (mode === "user") {
-        if (!targetUser?.id) {
-          return setError("ابحث عن المستخدم برقم الهاتف أولاً ثم أكمل التحويل.");
-        }
+        if (!targetUser?.id) return setError("ابحث عن المستخدم برقم الهاتف أولًا ثم أكمل التحويل.");
         target = targetUser;
-        transferType = "user_to_user";
       } else {
-        if (!storeId) return setError("اختر المحل أولاً.");
+        if (!storeId) return setError("اختر المحل أولًا.");
         target = selectedStore;
-        if (!target) return setError("المحل غير متاح حالياً.");
+        if (!target) return setError("المحل غير متاح حاليًا.");
         transferType = "user_to_store";
       }
 
@@ -201,18 +219,10 @@ export default function Transfer() {
       <h1>تحويل النقاط</h1>
 
       <div className="card split">
-        <button
-          type="button"
-          className={`btn ${mode === "user" ? "" : "btn-outline"}`}
-          onClick={() => switchMode("user")}
-        >
+        <button type="button" className={`btn ${mode === "user" ? "" : "btn-outline"}`} onClick={() => switchMode("user")}>
           إلى مستخدم
         </button>
-        <button
-          type="button"
-          className={`btn ${mode === "store" ? "" : "btn-outline"}`}
-          onClick={() => switchMode("store")}
-        >
+        <button type="button" className={`btn ${mode === "store" ? "" : "btn-outline"}`} onClick={() => switchMode("store")}>
           إلى محل
         </button>
       </div>
@@ -220,12 +230,10 @@ export default function Transfer() {
       <div className="card">
         <h3>رؤية سريعة</h3>
         <p className="muted">رصيدك الحالي: {formatPoints(profile?.points)} نقطة</p>
-        <p className="muted">
-          المحلات المتاحة: {summary.total} (شريك: {summary.partnerCount} | تجميع: {summary.collectorCount})
-        </p>
+        <p className="muted">المحلات المتاحة: {summary.total} (شريك: {summary.partnerCount} | تجميع: {summary.collectorCount})</p>
       </div>
 
-      <form className="card" onSubmit={submit} noValidate>
+      <form className="card transfer-form" onSubmit={submit} noValidate>
         {mode === "user" ? (
           <>
             <div className="split">
@@ -249,9 +257,7 @@ export default function Transfer() {
 
             {targetUser ? (
               <div className="card" style={{ marginTop: 8 }}>
-                <p>
-                  <strong>تم العثور على المستخدم:</strong> {targetUser.name || "-"}
-                </p>
+                <p><strong>تم العثور على المستخدم:</strong> {targetUser.name || "-"}</p>
                 <p className="muted">الهاتف: {targetUser.phone || "-"}</p>
               </div>
             ) : null}
@@ -260,6 +266,7 @@ export default function Transfer() {
           <label>
             اختر المحل (شريك أو تجميع)
             <select
+              className="transfer-shop-select"
               value={storeId}
               onChange={(e) => {
                 setStoreId(e.target.value);
@@ -269,9 +276,9 @@ export default function Transfer() {
               required
             >
               <option value="">اختر محلاً...</option>
-              {stores.map((p) => (
+              {filteredStores.map((p) => (
                 <option key={p.id} value={p.id}>
-                  [{storeRoleLabel(p.role)}] {p.store_name || p.name} - {p.phone}
+                  {(p.store_name || p.name || "-")} - {storeRoleLabel(p.role)}
                 </option>
               ))}
             </select>
@@ -279,17 +286,15 @@ export default function Transfer() {
         )}
 
         {selectedTarget ? (
-          <div className="card" style={{ marginTop: 8, marginBottom: 8 }}>
-            <p>
-              <strong>المستلم المختار:</strong>{" "}
-              {selectedTarget.store_name || selectedTarget.name || "-"}
-            </p>
+          <div className="card transfer-target-card" style={{ marginTop: 8, marginBottom: 8 }}>
+            <p><strong>المستلم المختار:</strong> {selectedTarget.store_name || selectedTarget.name || "-"}</p>
             <p className="muted">الهاتف: {selectedTarget.phone || "-"}</p>
             {selectedTarget.role ? <p className="muted">النوع: {storeRoleLabel(selectedTarget.role)}</p> : null}
+            {selectedTarget.store_category ? <p className="muted">التصنيف: {categoryLabel(selectedTarget.store_category)}</p> : null}
           </div>
         ) : (
           <p className="muted" style={{ marginTop: 8, marginBottom: 8 }}>
-            اختر المستلم أولاً قبل تأكيد التحويل.
+            اختر المستلم أولًا قبل تأكيد التحويل.
           </p>
         )}
 
@@ -313,7 +318,7 @@ export default function Transfer() {
         {error ? <p className="error">{error}</p> : null}
 
         <button className="btn" type="submit" disabled={!selectedTarget || searchingUser}>
-          {!selectedTarget ? "اختر المستلم أولاً" : "تأكيد التحويل"}
+          {!selectedTarget ? "اختر المستلم أولًا" : "تأكيد التحويل"}
         </button>
       </form>
 
@@ -321,9 +326,48 @@ export default function Transfer() {
         <div className="card">
           <h3>المحلات المتاحة</h3>
           {loadingStores ? <p className="muted">جاري تحميل قائمة المحلات...</p> : null}
+
+          <div className="transfer-categories">
+            <button
+              type="button"
+              className={`btn btn-small ${selectedCategory === "all" ? "" : "btn-outline"}`}
+              onClick={() => setSelectedCategory("all")}
+            >
+              الكل
+            </button>
+            {categories.map((cat) => (
+              <button
+                type="button"
+                key={cat}
+                className={`btn btn-small ${selectedCategory === cat ? "" : "btn-outline"}`}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {categoryLabel(cat)}
+              </button>
+            ))}
+          </div>
+
           <div className="shops-grid">
-            {stores.map((shop) => (
-              <article className="shop-item" key={shop.id}>
+            {filteredStores.map((shop) => (
+              <article
+                className={`shop-item shop-item-selectable ${storeId === shop.id ? "shop-item-selected" : ""}`}
+                key={shop.id}
+                onClick={() => {
+                  setStoreId(shop.id);
+                  setMsg("");
+                  setError("");
+                }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setStoreId(shop.id);
+                    setMsg("");
+                    setError("");
+                  }
+                }}
+              >
                 <img
                   src={shop.photo_url || "/icons/icon-192.svg"}
                   alt={shop.store_name || shop.name || "محل"}
@@ -333,15 +377,16 @@ export default function Transfer() {
                     e.currentTarget.src = "/icons/icon-192.svg";
                   }}
                 />
-                <div>
-                  <h4>{shop.store_name || shop.name || "-"}</h4>
-                  <p className="muted">{shop.phone || "-"}</p>
+                <div className="shop-item-copy">
+                  <h4 className="shop-name">{shop.store_name || shop.name || "-"}</h4>
+                  <p className="muted shop-meta">{shop.phone || "-"}</p>
                   <p className="muted">{storeRoleLabel(shop.role)}</p>
+                  <p className="muted">{categoryLabel(shop.store_category)}</p>
                 </div>
               </article>
             ))}
           </div>
-          {!stores.length && !loadingStores ? <p className="muted">لا توجد محلات متاحة حالياً.</p> : null}
+          {!filteredStores.length && !loadingStores ? <p className="muted">لا توجد محلات في هذا التصنيف حاليًا.</p> : null}
         </div>
       ) : null}
     </section>
