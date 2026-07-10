@@ -3,13 +3,14 @@ name: Publish Nuqta Khadra v1.0.1
 on:
   push:
     branches:
-      - "release/v1.0.1"
+      - "main"
 
 permissions:
   contents: write
 
 jobs:
   publish:
+    if: contains(github.event.head_commit.message, '[release-v1.0.1]')
     runs-on: ubuntu-latest
 
     steps:
@@ -115,7 +116,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.1
-          target_commitish: release/v1.0.1
+          target_commitish: main
           name: "Nuqta Khadra v1.0.1"
           body: |
             تحديث جديد لتطبيق نقطة خضراء.
