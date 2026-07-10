@@ -1,0 +1,131 @@
+name: Publish Nuqta Khadra v1.0.1
+
+on:
+  push:
+    branches:
+      - "main"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: contains(github.event.head_commit.message, '[release-v1.0.1]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+          VITE_APP_VERSION: "1.0.1"
+          VITE_CAPGO_LIVE_UPDATES: "0"
+          VITE_UPDATE_API_URL: "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update"
+
+      - name: Create live-update package
+        run: |
+          mkdir -p release
+          cd dist
+          zip -r ../release/dist.zip .
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Prepare Android signing
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          cat > android/keystore.properties <<EOF
+          storeFile=app/release.keystore
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          EOF
+
+      - name: Build signed release APK
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PappVersionCode=2 -PappVersionName=1.0.1
+
+      - name: Build debug APK fallback
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug -PappVersionCode=2 -PappVersionName=1.0.1
+
+      - name: Prepare APK file
+        run: |
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk release/nuqta-khadra-v1.0.1.apk
+          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            echo "Release APK is unsigned; refusing to publish an uninstall-required update."
+            exit 1
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk release/nuqta-khadra-v1.0.1.apk
+          fi
+
+      - name: Upload public APK and update bundle
+        env:
+          UPDATE_API: "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES=$(node -p "encodeURIComponent('صفحة دخول جديدة وتحسين تجربة استخدام تطبيق نقطة خضراء.')")
+          curl --fail --show-error --silent -X POST "$UPDATE_API" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "x-version: 1.0.1" \
+            -H "x-version-code: 2" \
+            -H "x-kind: apk" \
+            -H "x-notes: $NOTES" \
+            -H "x-mandatory: true" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @release/nuqta-khadra-v1.0.1.apk
+          curl --fail --show-error --silent -X POST "$UPDATE_API" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "x-version: 1.0.1" \
+            -H "x-version-code: 2" \
+            -H "x-kind: dist" \
+            -H "x-notes: $NOTES" \
+            -H "x-mandatory: true" \
+            -H "Content-Type: application/zip" \
+            --data-binary @release/dist.zip
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.1
+          target_commitish: main
+          name: "Nuqta Khadra v1.0.1"
+          body: |
+            تحديث جديد لتطبيق نقطة خضراء.
+
+            - إعادة تصميم صفحة تسجيل الدخول.
+            - تحسين العرض على الهاتف.
+            - إضافة إظهار وإخفاء كلمة المرور.
+            - إضافة مسار عام وآمن لتنزيل تحديثات التطبيق.
+          make_latest: true
+          files: |
+            release/nuqta-khadra-v1.0.1.apk
+            release/dist.zip

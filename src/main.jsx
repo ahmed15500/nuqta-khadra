@@ -19,7 +19,10 @@ if (import.meta.env.PROD) {
 initCapgoLiveUpdates({
   enabled: import.meta.env.VITE_CAPGO_LIVE_UPDATES === "1",
   repo: import.meta.env.VITE_GITHUB_REPO || "ahmed15500/nuqta-khadra",
-  currentVersion: import.meta.env.VITE_APP_VERSION || "0.0.0"
+  currentVersion: import.meta.env.VITE_APP_VERSION || "0.0.0",
+  updateApi:
+    import.meta.env.VITE_UPDATE_API_URL ||
+    "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update"
 });
 
 ReactDOM.createRoot(document.getElementById("root")).render(
