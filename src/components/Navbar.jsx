@@ -4,7 +4,8 @@ import PointsBadge from "./PointsBadge";
 import { roles } from "../lib/supabase";
 
 const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
-const rdcLogoFallback = "/icons/icon-192.svg";
+const appLogoUrl = "/icons/nuqta-logo.png";
+const rdcLogoFallback = "/icons/icon-192.png";
 
 const roleLinks = {
   [roles.COLLECTOR]: [
@@ -50,7 +51,10 @@ export default function Navbar() {
 
   return (
     <header className={`navbar ${isUserRole ? "navbar-user" : ""}`}>
-      <div className="brand">نقطة خضراء</div>
+      <div className="brand">
+        <img className="brand-logo" src={appLogoUrl} alt="" aria-hidden="true" />
+        <span>نقطة خضراء</span>
+      </div>
 
       {links.length ? (
         <nav>

@@ -1,0 +1,207 @@
+name: Publish Nuqta Khadra v1.0.2
+
+on:
+  push:
+    branches:
+      - "main"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release-v1.0.2]')
+    runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      UPDATE_API: "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update"
+      SUPABASE_URL: "https://nxbakauhojxgavjnpsia.supabase.co"
+      SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web application
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_GITHUB_REPO: ${{ github.repository }}
+          VITE_APP_VERSION: "1.0.2"
+          VITE_CAPGO_LIVE_UPDATES: "0"
+          VITE_UPDATE_API_URL: "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update"
+
+      - name: Create live-update package
+        run: |
+          mkdir -p release
+          cd dist
+          zip -r ../release/dist.zip .
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "21"
+
+      - name: Prepare Android signing
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
+          cat > android/keystore.properties <<EOF
+          storeFile=app/release.keystore
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          EOF
+
+      - name: Build signed release APK
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease -PappVersionCode=3 -PappVersionName=1.0.2
+
+      - name: Build debug APK fallback
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' }}
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug -PappVersionCode=3 -PappVersionName=1.0.2
+
+      - name: Prepare APK file
+        run: |
+          if [ -f android/app/build/outputs/apk/release/app-release.apk ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk release/nuqta-khadra-v1.0.2.apk
+          elif [ -f android/app/build/outputs/apk/release/app-release-unsigned.apk ]; then
+            echo "Release APK is unsigned; refusing to publish an uninstall-required update."
+            exit 1
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk release/nuqta-khadra-v1.0.2.apk
+          fi
+
+      - name: Request signed Storage upload URLs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl --fail --show-error --silent -X POST "$UPDATE_API" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "x-action: sign" \
+            -H "x-version: 1.0.2" \
+            -H "x-kind: apk" > release/apk-sign.json
+          curl --fail --show-error --silent -X POST "$UPDATE_API" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "x-action: sign" \
+            -H "x-version: 1.0.2" \
+            -H "x-kind: dist" > release/dist-sign.json
+
+      - name: Upload APK directly to Storage
+        env:
+          SIGN_FILE: release/apk-sign.json
+          ASSET_FILE: release/nuqta-khadra-v1.0.2.apk
+          CONTENT_TYPE: application/vnd.android.package-archive
+          OUTPUT_FILE: release/apk-url.txt
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { createClient } from "@supabase/supabase-js";
+
+          const sign = JSON.parse(fs.readFileSync(process.env.SIGN_FILE, "utf8"));
+          if (!sign.bucket || !sign.path || !sign.token || !sign.publicUrl) {
+            throw new Error(`Invalid signed upload response: ${JSON.stringify(sign)}`);
+          }
+
+          const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false }
+          });
+          const file = new Blob([fs.readFileSync(process.env.ASSET_FILE)], { type: process.env.CONTENT_TYPE });
+          const { error } = await client.storage
+            .from(sign.bucket)
+            .uploadToSignedUrl(sign.path, sign.token, file, { contentType: process.env.CONTENT_TYPE, upsert: true });
+          if (error) throw error;
+          fs.writeFileSync(process.env.OUTPUT_FILE, sign.publicUrl);
+          NODE
+
+      - name: Upload live-update bundle directly to Storage
+        env:
+          SIGN_FILE: release/dist-sign.json
+          ASSET_FILE: release/dist.zip
+          CONTENT_TYPE: application/zip
+          OUTPUT_FILE: release/dist-url.txt
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          import { createClient } from "@supabase/supabase-js";
+
+          const sign = JSON.parse(fs.readFileSync(process.env.SIGN_FILE, "utf8"));
+          if (!sign.bucket || !sign.path || !sign.token || !sign.publicUrl) {
+            throw new Error(`Invalid signed upload response: ${JSON.stringify(sign)}`);
+          }
+
+          const client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false }
+          });
+          const file = new Blob([fs.readFileSync(process.env.ASSET_FILE)], { type: process.env.CONTENT_TYPE });
+          const { error } = await client.storage
+            .from(sign.bucket)
+            .uploadToSignedUrl(sign.path, sign.token, file, { contentType: process.env.CONTENT_TYPE, upsert: true });
+          if (error) throw error;
+          fs.writeFileSync(process.env.OUTPUT_FILE, sign.publicUrl);
+          NODE
+
+      - name: Publish update manifest
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from "node:fs";
+          const metadata = {
+            version: "1.0.2",
+            versionCode: 3,
+            apkUrl: fs.readFileSync("release/apk-url.txt", "utf8").trim(),
+            distUrl: fs.readFileSync("release/dist-url.txt", "utf8").trim(),
+            notes: "تحديث شعار نقطة خضراء وأيقونة التطبيق وشاشة البدء.",
+            mandatory: false
+          };
+          fs.writeFileSync("release/update.json", JSON.stringify(metadata));
+          NODE
+          curl --fail --show-error --silent -X POST "$UPDATE_API" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "x-action: publish" \
+            -H "Content-Type: application/json" \
+            --data-binary @release/update.json
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.2
+          target_commitish: main
+          name: "Nuqta Khadra v1.0.2"
+          body: |
+            تحديث الهوية البصرية لتطبيق نقطة خضراء.
+
+            - إضافة شعار GP الجديد داخل التطبيق.
+            - تحديث أيقونات الويب وAndroid.
+            - تحديث شاشة بدء التطبيق.
+            - الحفاظ على نفس الحزمة ومفتاح التوقيع للتحديث فوق النسخة الحالية.
+          make_latest: true
+          files: |
+            release/nuqta-khadra-v1.0.2.apk
+            release/dist.zip
+
