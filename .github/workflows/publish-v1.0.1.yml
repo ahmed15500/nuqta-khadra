@@ -18,6 +18,11 @@ jobs:
       (github.event_name == 'push' && contains(github.event.head_commit.message, '[release-v1.0.1]')) ||
       (github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[release-v1.0.1]'))
     runs-on: ubuntu-latest
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -58,25 +63,25 @@ jobs:
           java-version: "21"
 
       - name: Prepare Android signing
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/release.keystore
           cat > android/keystore.properties <<EOF
           storeFile=app/release.keystore
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
       - name: Build signed release APK
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 != '' }}
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease -PappVersionCode=2 -PappVersionName=1.0.1
 
       - name: Build debug APK fallback
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 == '' }}
+        if: ${{ env.ANDROID_KEYSTORE_BASE64 == '' }}
         run: |
           cd android
           chmod +x gradlew
@@ -96,7 +101,7 @@ jobs:
       - name: Upload public APK and update bundle
         env:
           UPDATE_API: "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update"
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           NOTES=$(node -p "encodeURIComponent('صفحة دخول جديدة وتحسين تجربة استخدام تطبيق نقطة خضراء.')")
           curl --fail --show-error --silent -X POST "$UPDATE_API" \
