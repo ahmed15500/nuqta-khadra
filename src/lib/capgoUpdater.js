@@ -1,6 +1,7 @@
 import { Capacitor } from "@capacitor/core";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 
+const DEFAULT_UPDATE_API = "https://nxbakauhojxgavjnpsia.supabase.co/functions/v1/nuqta-update";
 const CHECK_INTERVAL_MS = 10 * 60 * 1000;
 const LAST_APPLIED_VERSION_KEY = "nuqta_capgo_last_applied_version";
 
@@ -40,15 +41,45 @@ const resolveDistZipAsset = (release) =>
     return name === "dist.zip" || name.endsWith("/dist.zip") || name.endsWith("dist.zip");
   });
 
+async function fetchPublicBundle(updateApi) {
+  if (!updateApi) return null;
+  const separator = updateApi.includes("?") ? "&" : "?";
+  const response = await fetch(`${updateApi}${separator}ts=${Date.now()}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store"
+  });
+  if (!response.ok) return null;
+  const payload = await response.json();
+  const update = payload?.update;
+  if (!update?.version || !update?.dist_url) return null;
+  return {
+    version: normalizeVersion(update.version),
+    url: update.dist_url
+  };
+}
+
+async function fetchGitHubBundle(repo) {
+  if (!repo) return null;
+  const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest?ts=${Date.now()}`, {
+    headers: { Accept: "application/vnd.github+json" },
+    cache: "no-store"
+  });
+  if (!response.ok) return null;
+  const release = await response.json();
+  const version = normalizeVersion(release?.tag_name || release?.name);
+  const distZip = resolveDistZipAsset(release);
+  if (!version || !distZip?.browser_download_url) return null;
+  return { version, url: distZip.browser_download_url };
+}
+
 let started = false;
 
-export function initCapgoLiveUpdates({ enabled, repo, currentVersion }) {
+export function initCapgoLiveUpdates({ enabled, repo, currentVersion, updateApi }) {
   if (started) return;
   started = true;
 
   if (!Capacitor.isNativePlatform()) return;
 
-  // Must be called on each app launch to mark bundle as healthy and avoid rollback.
   CapacitorUpdater.notifyAppReady().catch(() => {
     // Keep startup resilient.
   });
@@ -56,7 +87,8 @@ export function initCapgoLiveUpdates({ enabled, repo, currentVersion }) {
   if (!enabled) return;
 
   const normalizedCurrentVersion = normalizeVersion(currentVersion || "0.0.0");
-  if (!repo || !normalizedCurrentVersion || normalizedCurrentVersion === "0.0.0") return;
+  const publicUpdateApi = updateApi || DEFAULT_UPDATE_API;
+  if (!normalizedCurrentVersion || normalizedCurrentVersion === "0.0.0") return;
 
   let checking = false;
 
@@ -65,31 +97,22 @@ export function initCapgoLiveUpdates({ enabled, repo, currentVersion }) {
     checking = true;
 
     try {
-      const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest?ts=${Date.now()}`, {
-        headers: { Accept: "application/vnd.github+json" }
-      });
-      if (!response.ok) return;
-
-      const release = await response.json();
-      const latestVersion = normalizeVersion(release?.tag_name || release?.name);
-      if (!latestVersion) return;
-
-      const distZip = resolveDistZipAsset(release);
-      if (!distZip?.browser_download_url) return;
+      const latest = (await fetchPublicBundle(publicUpdateApi)) || (await fetchGitHubBundle(repo));
+      if (!latest?.version || !latest?.url) return;
 
       const runtimeBundle = await CapacitorUpdater.current().catch(() => null);
       const runtimeVersion = normalizeVersion(runtimeBundle?.bundle?.version || "");
       const localApplied = normalizeVersion(localStorage.getItem(LAST_APPLIED_VERSION_KEY) || "");
       const baselineVersion = maxVersion([normalizedCurrentVersion, runtimeVersion, localApplied]);
 
-      if (compareVersions(latestVersion, baselineVersion) <= 0) return;
+      if (compareVersions(latest.version, baselineVersion) <= 0) return;
 
       const downloaded = await CapacitorUpdater.download({
-        version: latestVersion,
-        url: distZip.browser_download_url
+        version: latest.version,
+        url: latest.url
       });
 
-      localStorage.setItem(LAST_APPLIED_VERSION_KEY, latestVersion);
+      localStorage.setItem(LAST_APPLIED_VERSION_KEY, latest.version);
       await CapacitorUpdater.set(downloaded);
     } catch {
       // Keep app stable if update check/download fails.
@@ -102,9 +125,7 @@ export function initCapgoLiveUpdates({ enabled, repo, currentVersion }) {
   const intervalId = window.setInterval(runCheck, CHECK_INTERVAL_MS);
 
   const onVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      runCheck();
-    }
+    if (document.visibilityState === "visible") runCheck();
   };
 
   window.addEventListener("online", runCheck);
@@ -118,4 +139,3 @@ export function initCapgoLiveUpdates({ enabled, repo, currentVersion }) {
     document.removeEventListener("visibilitychange", onVisibilityChange);
   });
 }
-
