@@ -441,7 +441,7 @@ export default function ManageStores() {
               alt="معاينة صورة المحل"
               onError={(e) => {
                 e.currentTarget.onerror = null;
-                e.currentTarget.src = "/icons/icon-192.svg";
+                e.currentTarget.src = "/icons/icon-192.png";
               }}
             />
           </div>
@@ -496,12 +496,12 @@ export default function ManageStores() {
               <tr key={s.id}>
                 <td>
                   <img
-                    src={s.photo_url || "/icons/icon-192.svg"}
+                    src={s.photo_url || "/icons/icon-192.png"}
                     alt={s.store_name || s.name || "محل"}
                     className="shop-photo-thumb"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/icons/icon-192.svg";
+                      e.currentTarget.src = "/icons/icon-192.png";
                     }}
                   />
                 </td>

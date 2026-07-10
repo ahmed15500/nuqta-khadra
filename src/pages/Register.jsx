@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
-const rdcLogoFallback = "/icons/icon-192.svg";
+const appLogoUrl = "/icons/nuqta-logo.png";
+const rdcLogoFallback = "/icons/icon-192.png";
 
 export default function Register() {
   const { register } = useAuth();
@@ -30,6 +31,13 @@ export default function Register() {
   return (
     <main className="auth-wrap">
       <form className="card auth-card" onSubmit={onSubmit}>
+        <div className="auth-app-brand">
+          <img src={appLogoUrl} alt="" aria-hidden="true" />
+          <span>
+            <strong>نقطة خضراء</strong>
+            <small>Nuqta Khadra</small>
+          </span>
+        </div>
         <h1>إنشاء حساب مستخدم</h1>
 
         <a className="powered-by auth-powered" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">

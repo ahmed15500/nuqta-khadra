@@ -5,7 +5,6 @@ import {
   Eye,
   EyeOff,
   Gift,
-  Leaf,
   LockKeyhole,
   Phone,
   Recycle,
@@ -14,7 +13,8 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 
 const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
-const rdcLogoFallback = "/icons/icon-192.svg";
+const appLogoUrl = "/icons/nuqta-logo.png";
+const rdcLogoFallback = "/icons/icon-192.png";
 
 export default function Login() {
   const { login, session, profile } = useAuth();
@@ -55,7 +55,7 @@ export default function Login() {
           <div className="login-hero-glow login-hero-glow-two" />
 
           <div className="login-brand-mark" aria-hidden="true">
-            <Leaf size={31} strokeWidth={2.4} />
+            <img className="login-brand-image" src={appLogoUrl} alt="" />
           </div>
 
           <div className="login-hero-copy">
@@ -83,7 +83,7 @@ export default function Login() {
         <form className="login-form-panel" onSubmit={onSubmit} noValidate>
           <div className="login-mobile-brand">
             <div className="login-mobile-logo" aria-hidden="true">
-              <Leaf size={24} strokeWidth={2.5} />
+              <img className="login-mobile-logo-image" src={appLogoUrl} alt="" />
             </div>
             <div>
               <strong>نقطة خضراء</strong>
@@ -253,12 +253,17 @@ const loginStyles = `
     z-index: 1;
     width: 68px;
     height: 68px;
-    display: grid;
-    place-items: center;
-    border-radius: 22px;
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    overflow: hidden;
+    border-radius: 20px;
+    background: transparent;
+    box-shadow: 0 12px 28px rgba(4, 49, 28, 0.3);
+  }
+
+  .login-brand-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
   }
 
   .login-hero-copy {
@@ -331,11 +336,17 @@ const loginStyles = `
   .login-mobile-logo {
     width: 48px;
     height: 48px;
-    display: grid;
-    place-items: center;
+    overflow: hidden;
     border-radius: 16px;
-    color: #fff;
-    background: linear-gradient(145deg, var(--green-900), var(--olive-700));
+    background: transparent;
+    box-shadow: 0 8px 18px rgba(5, 97, 54, 0.2);
+  }
+
+  .login-mobile-logo-image {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
   }
 
   .login-mobile-brand strong,

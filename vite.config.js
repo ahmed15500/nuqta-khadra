@@ -9,28 +9,40 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icons/icon-192.svg", "icons/icon-512.svg"],
+      includeAssets: [
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+        "icons/icon-maskable-512.png",
+        "icons/nuqta-logo.png"
+      ],
       manifest: {
         name: "Nuqta Khadra",
         short_name: "نقطة خضراء",
         description: "منظومة إدارة إعادة التدوير بنظام النقاط",
-        theme_color: "#0f4d32",
-        background_color: "#f7f2e8",
+        theme_color: "#056136",
+        background_color: "#f6f9f4",
         display: "standalone",
         start_url: "/",
         lang: "ar",
         dir: "rtl",
         icons: [
           {
-            src: "/icons/icon-192.svg",
+            src: "/icons/icon-192.png",
             sizes: "192x192",
-            type: "image/svg+xml"
+            type: "image/png",
+            purpose: "any"
           },
           {
-            src: "/icons/icon-512.svg",
+            src: "/icons/icon-512.png",
             sizes: "512x512",
-            type: "image/svg+xml",
-            purpose: "any maskable"
+            type: "image/png",
+            purpose: "any"
+          },
+          {
+            src: "/icons/icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable"
           }
         ]
       }
