@@ -135,7 +135,10 @@ export default function AdminHome() {
       <p className="muted">بيانات مباشرة عن العملاء والمحلات وحركة النقاط.</p>
 
       <div className="card admin-links">
-        <Link to="/admin/stores" className="btn">
+        <Link to="/admin/users" className="btn">
+          حسابات المستخدمين
+        </Link>
+        <Link to="/admin/stores" className="btn btn-outline">
           إدارة المحلات
         </Link>
         <Link to="/admin/prices" className="btn btn-outline">
