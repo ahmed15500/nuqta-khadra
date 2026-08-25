@@ -14,6 +14,7 @@ import UserTransactions from "./pages/user/UserTransactions";
 import UserSettings from "./pages/user/UserSettings";
 import PartnerHome from "./pages/partner/PartnerHome";
 import AdminHome from "./pages/admin/AdminHome";
+import ManageUsers from "./pages/admin/ManageUsers";
 import ManagePrices from "./pages/admin/ManagePrices";
 import ManageStores from "./pages/admin/ManageStores";
 import ManageTransactions from "./pages/admin/ManageTransactions";
@@ -179,6 +180,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[roles.ADMIN]}>
               <AdminHome />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute allowedRoles={[roles.ADMIN]}>
+              <ManageUsers />
             </ProtectedRoute>
           }
         />
