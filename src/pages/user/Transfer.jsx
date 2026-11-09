@@ -369,12 +369,12 @@ export default function Transfer() {
                 }}
               >
                 <img
-                  src={shop.photo_url || "/icons/icon-192.png"}
+                  src={shop.photo_url || (import.meta.env.BASE_URL + "icons/icon-192.png")}
                   alt={shop.store_name || shop.name || "محل"}
                   className="shop-photo"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = "/icons/icon-192.png";
+                    e.currentTarget.src = (import.meta.env.BASE_URL + "icons/icon-192.png");
                   }}
                 />
                 <div className="shop-item-copy">

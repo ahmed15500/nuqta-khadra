@@ -12,9 +12,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
-const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
-const appLogoUrl = "/icons/nuqta-logo.png";
-const rdcLogoFallback = "/icons/icon-192.png";
+const appLogoUrl = (import.meta.env.BASE_URL + "icons/nuqta-logo.png");
 
 export default function Login() {
   const { login, session, profile } = useAuth();
@@ -158,21 +156,15 @@ export default function Login() {
             ليس لديك حساب؟ <Link to="/register">إنشاء حساب جديد</Link>
           </p>
 
-          <a className="login-powered" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
-            <img
-              src={rdcLogoUrl}
-              alt="مركز التنمية الريفية - جامعة هليوبوليس"
-              loading="lazy"
-              onError={(event) => {
-                if (event.currentTarget.src.endsWith(rdcLogoFallback)) return;
-                event.currentTarget.src = rdcLogoFallback;
-              }}
-            />
+          <div className="login-powered">
+            <span className="sadeem-mark" aria-hidden="true">
+              سديم
+            </span>
             <span>
               <small>بدعم من</small>
-              <strong>مركز التنمية الريفية - جامعة هليوبوليس</strong>
+              <strong>سديم للابتكار وحلول الاستدامة</strong>
             </span>
-          </a>
+          </div>
         </form>
       </section>
     </main>
@@ -194,9 +186,9 @@ const loginStyles = `
     grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
     overflow: hidden;
     border-radius: 30px;
-    border: 1px solid rgba(19, 92, 79, 0.16);
-    background: rgba(255, 255, 255, 0.92);
-    box-shadow: 0 26px 70px rgba(12, 47, 42, 0.2);
+    border: 1px solid rgba(206, 139, 95, 0.3);
+    background: rgba(16, 27, 38, 0.92);
+    box-shadow: 0 26px 70px rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(16px);
   }
 
@@ -210,8 +202,8 @@ const loginStyles = `
     padding: clamp(34px, 5vw, 58px);
     color: #fff;
     background:
-      linear-gradient(145deg, rgba(10, 48, 41, 0.98), rgba(19, 92, 79, 0.96) 55%, rgba(107, 132, 43, 0.94)),
-      radial-gradient(circle at 20% 15%, rgba(255, 255, 255, 0.16), transparent 36%);
+      linear-gradient(145deg, rgba(11, 20, 28, 0.98), rgba(20, 34, 47, 0.96) 55%, rgba(27, 42, 58, 0.94)),
+      radial-gradient(circle at 20% 15%, rgba(61, 90, 118, 0.25), transparent 36%);
   }
 
   .login-hero::after {
@@ -220,9 +212,9 @@ const loginStyles = `
     inset: auto -65px -70px auto;
     width: 245px;
     height: 245px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(206, 139, 95, 0.16);
     border-radius: 50%;
-    box-shadow: 0 0 0 38px rgba(255, 255, 255, 0.05), 0 0 0 76px rgba(255, 255, 255, 0.035);
+    box-shadow: 0 0 0 38px rgba(206, 139, 95, 0.05), 0 0 0 76px rgba(206, 139, 95, 0.035);
   }
 
   .login-hero-glow {
@@ -237,7 +229,7 @@ const loginStyles = `
     height: 190px;
     top: -90px;
     left: -70px;
-    background: rgba(223, 195, 104, 0.2);
+    background: rgba(206, 139, 95, 0.18);
   }
 
   .login-hero-glow-two {
@@ -245,7 +237,7 @@ const loginStyles = `
     height: 160px;
     right: 40px;
     bottom: 120px;
-    background: rgba(174, 214, 112, 0.12);
+    background: rgba(61, 90, 118, 0.25);
   }
 
   .login-brand-mark {
@@ -256,7 +248,8 @@ const loginStyles = `
     overflow: hidden;
     border-radius: 20px;
     background: transparent;
-    box-shadow: 0 12px 28px rgba(4, 49, 28, 0.3);
+    border: 1px solid rgba(206, 139, 95, 0.45);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
   }
 
   .login-brand-image {
@@ -274,7 +267,7 @@ const loginStyles = `
   .login-eyebrow {
     display: inline-block;
     margin-bottom: 12px;
-    color: #e4ecb9;
+    color: #e8b088;
     font-size: 0.78rem;
     font-weight: 900;
     letter-spacing: 2px;
@@ -291,7 +284,7 @@ const loginStyles = `
   .login-hero-copy p {
     max-width: 440px;
     margin: 20px 0 0;
-    color: rgba(255, 255, 255, 0.82);
+    color: rgba(243, 239, 233, 0.78);
     font-size: 1.04rem;
     line-height: 1.9;
   }
@@ -309,9 +302,9 @@ const loginStyles = `
     gap: 11px;
     padding: 12px 14px;
     border-radius: 15px;
-    color: rgba(255, 255, 255, 0.9);
-    background: rgba(255, 255, 255, 0.09);
-    border: 1px solid rgba(255, 255, 255, 0.13);
+    color: rgba(243, 239, 233, 0.92);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(206, 139, 95, 0.22);
     font-size: 0.92rem;
     font-weight: 750;
   }
@@ -322,8 +315,8 @@ const loginStyles = `
     justify-content: center;
     padding: clamp(30px, 5vw, 56px);
     background:
-      radial-gradient(circle at 95% 5%, rgba(127, 153, 50, 0.1), transparent 28%),
-      linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(249, 249, 244, 0.96));
+      radial-gradient(circle at 95% 5%, rgba(61, 90, 118, 0.18), transparent 28%),
+      linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
   }
 
   .login-mobile-brand {
@@ -339,7 +332,8 @@ const loginStyles = `
     overflow: hidden;
     border-radius: 16px;
     background: transparent;
-    box-shadow: 0 8px 18px rgba(5, 97, 54, 0.2);
+    border: 1px solid rgba(206, 139, 95, 0.4);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
   }
 
   .login-mobile-logo-image {
@@ -412,7 +406,7 @@ const loginStyles = `
     top: 50%;
     right: 15px;
     z-index: 1;
-    color: #658078;
+    color: #9db0c1;
     transform: translateY(-50%);
     pointer-events: none;
   }
@@ -421,23 +415,23 @@ const loginStyles = `
     width: 100%;
     min-height: 54px;
     padding: 12px 48px 12px 46px;
-    border: 1px solid rgba(19, 92, 79, 0.18);
+    border: 1px solid rgba(157, 176, 193, 0.25);
     border-radius: 16px;
     color: var(--green-950);
-    background: rgba(255, 255, 255, 0.94);
-    box-shadow: 0 4px 12px rgba(19, 92, 79, 0.045);
+    background: #0f1a24;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     font: inherit;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
 
   .login-input::placeholder {
-    color: #96a8a3;
+    color: rgba(157, 176, 193, 0.55);
   }
 
   .login-input:focus {
     outline: none;
-    border-color: rgba(19, 92, 79, 0.72);
-    box-shadow: 0 0 0 4px rgba(45, 138, 114, 0.12), 0 8px 18px rgba(19, 92, 79, 0.07);
+    border-color: rgba(206, 139, 95, 0.8);
+    box-shadow: 0 0 0 4px rgba(206, 139, 95, 0.15), 0 8px 18px rgba(0, 0, 0, 0.3);
   }
 
   .login-phone-input {
@@ -456,7 +450,7 @@ const loginStyles = `
     padding: 0;
     border: 0;
     border-radius: 11px;
-    color: #658078;
+    color: #9db0c1;
     background: transparent;
     cursor: pointer;
     transform: translateY(-50%);
@@ -472,10 +466,10 @@ const loginStyles = `
   .login-error {
     margin: 0 0 16px;
     padding: 11px 13px;
-    border: 1px solid rgba(180, 35, 24, 0.16);
+    border: 1px solid rgba(229, 96, 79, 0.35);
     border-radius: 13px;
     color: var(--danger);
-    background: rgba(180, 35, 24, 0.055);
+    background: rgba(229, 96, 79, 0.1);
     font-size: 0.86rem;
     font-weight: 750;
     line-height: 1.6;
@@ -492,9 +486,9 @@ const loginStyles = `
     padding: 12px 18px;
     border: 0;
     border-radius: 16px;
-    color: #fff;
-    background: linear-gradient(135deg, var(--green-900), var(--green-700) 58%, var(--olive-700));
-    box-shadow: 0 12px 24px rgba(19, 92, 79, 0.23);
+    color: #1a120b;
+    background: #ce8b5f;
+    box-shadow: 0 12px 24px rgba(206, 139, 95, 0.25);
     font: inherit;
     font-weight: 900;
     cursor: pointer;
@@ -503,11 +497,12 @@ const loginStyles = `
 
   .login-submit:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 15px 28px rgba(19, 92, 79, 0.28);
+    background: #d89e6e;
+    box-shadow: 0 15px 28px rgba(206, 139, 95, 0.35);
   }
 
   .login-submit:focus-visible {
-    outline: 3px solid rgba(45, 138, 114, 0.25);
+    outline: 3px solid rgba(206, 139, 95, 0.4);
     outline-offset: 3px;
   }
 
@@ -537,19 +532,17 @@ const loginStyles = `
     gap: 9px;
     margin-top: 30px;
     padding-top: 20px;
-    border-top: 1px solid rgba(19, 92, 79, 0.1);
+    border-top: 1px solid rgba(157, 176, 193, 0.15);
     color: inherit;
     text-decoration: none;
   }
 
-  .login-powered img {
+  .login-powered .sadeem-mark {
     width: 38px;
     height: 38px;
-    object-fit: contain;
-    padding: 3px;
-    border: 1px solid rgba(19, 92, 79, 0.13);
+    flex: 0 0 auto;
     border-radius: 11px;
-    background: #fff;
+    font-size: 0.8rem;
   }
 
   .login-powered span,

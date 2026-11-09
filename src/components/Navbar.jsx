@@ -3,9 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import PointsBadge from "./PointsBadge";
 import { roles } from "../lib/supabase";
 
-const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
-const appLogoUrl = "/icons/nuqta-logo.png";
-const rdcLogoFallback = "/icons/icon-192.png";
+const appLogoUrl = (import.meta.env.BASE_URL + "icons/nuqta-logo.png");
 
 const roleLinks = {
   [roles.COLLECTOR]: [
@@ -74,22 +72,15 @@ export default function Navbar() {
 
       <div className="nav-actions">
         {!isUserRole ? (
-          <a className="powered-by powered-by-nav" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
-            <img
-              src={rdcLogoUrl}
-              alt="Rural Development Center - Heliopolis University"
-              className="powered-logo"
-              loading="lazy"
-              onError={(e) => {
-                if (e.currentTarget.src.endsWith(rdcLogoFallback)) return;
-                e.currentTarget.src = rdcLogoFallback;
-              }}
-            />
+          <div className="powered-by powered-by-nav">
+            <span className="powered-logo sadeem-mark" aria-hidden="true">
+              سديم
+            </span>
             <span className="powered-copy powered-copy-en" lang="en" dir="ltr">
               <small>Powered by</small>
-              <strong>Rural Development Center - Heliopolis University</strong>
+              <strong>SADEEM for Innovation and Sustainability Solutions</strong>
             </span>
-          </a>
+          </div>
         ) : null}
 
         <div className="account-mini">

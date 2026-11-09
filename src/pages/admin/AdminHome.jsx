@@ -16,7 +16,7 @@ import { Users, Recycle, Coins, Store, Sparkles, History, Trophy } from "lucide-
 import { supabase } from "../../lib/supabase";
 
 const STORE_ROLES = ["collector_store", "partner_store"];
-const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#84cc16", "#f97316", "#ec4899", "#64748b"];
+const PIE_COLORS = ["#ce8b5f", "#e8b088", "#8a5a38", "#9db0c1", "#5b7186", "#35c48d", "#d9c6b2", "#3d5a76", "#a9713f", "#64748b"];
 
 async function loadProfilesWithOptionalPhoto() {
   const selectWithPhoto = "id,name,phone,role,points,store_name,store_category,photo_url,disabled,created_at";
@@ -67,7 +67,7 @@ const dashStyles = `
 .dash-stat-top { display:flex; align-items:center; justify-content:space-between; }
 .dash-stat-icon { width:46px; height:46px; border-radius:16px; display:flex; align-items:center; justify-content:center; color:#fff; }
 .dash-stat-label { color:var(--muted); font-size:13px; font-weight:700; }
-.dash-stat-value { font-size:30px; font-weight:800; line-height:1.1; }
+.dash-stat-value { font-size:30px; font-weight:800; line-height:1.1; color:var(--copper-bright); }
 .dash-chart-card { border-radius:28px; }
 .dash-feed { display:flex; flex-direction:column; gap:14px; }
 .dash-feed-item { display:flex; gap:12px; align-items:flex-start; }
@@ -76,12 +76,12 @@ const dashStyles = `
 .dash-feed-row { display:flex; justify-content:space-between; gap:8px; align-items:baseline; }
 .dash-feed-points { color:var(--success); font-weight:800; white-space:nowrap; }
 .dash-legend { display:flex; flex-direction:column; gap:10px; }
-.dash-legend-row { display:flex; align-items:center; gap:10px; border-bottom:1px dashed rgba(19,92,79,.12); padding-bottom:8px; }
+.dash-legend-row { display:flex; align-items:center; gap:10px; border-bottom:1px dashed rgba(206,139,95,.18); padding-bottom:8px; }
 .dash-legend-dot { width:12px; height:12px; border-radius:999px; flex-shrink:0; }
-.dash-warn { background:#fdf3e3; border:1px solid #e8cf9f; color:#7a5410; border-radius:16px; padding:10px 14px; font-size:14px; }
+.dash-warn { background:rgba(206,139,95,.12); border:1px solid rgba(206,139,95,.4); color:#e8b088; border-radius:16px; padding:10px 14px; font-size:14px; }
 .dash-leader { display:flex; flex-direction:column; gap:10px; }
-.dash-leader-row { display:flex; align-items:center; gap:12px; background:var(--sand-50); border:1px solid rgba(19,92,79,.08); border-radius:16px; padding:10px 14px; }
-.dash-leader-rank { width:30px; height:30px; border-radius:999px; background:var(--green-900); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; flex-shrink:0; }
+.dash-leader-row { display:flex; align-items:center; gap:12px; background:var(--sand-50); border:1px solid rgba(206,139,95,.14); border-radius:16px; padding:10px 14px; }
+.dash-leader-rank { width:30px; height:30px; border-radius:999px; background:var(--green-900); color:#1a120b; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; flex-shrink:0; }
 `;
 
 export default function AdminHome() {
@@ -293,10 +293,10 @@ export default function AdminHome() {
   const latestShops = useMemo(() => shops.slice(0, 8), [shops]);
 
   const statCards = [
-    { label: "العملاء", value: stats.customers.toLocaleString("ar-EG"), icon: Users, bg: "#2563eb" },
-    { label: "المخلفات المجمعة (كجم)", value: stats.totalWasteKg.toLocaleString("ar-EG", { maximumFractionDigits: 1 }), icon: Recycle, bg: "#059669" },
-    { label: "النقاط الممنوحة", value: stats.totalPointsIssued.toLocaleString("ar-EG"), icon: Coins, bg: "#d97706" },
-    { label: "المحلات (نشط / إجمالي)", value: `${stats.activeShops} / ${stats.shops}`, icon: Store, bg: "#4f46e5" }
+    { label: "العملاء", value: stats.customers.toLocaleString("ar-EG"), icon: Users, bg: "#ce8b5f" },
+    { label: "المخلفات المجمعة (كجم)", value: stats.totalWasteKg.toLocaleString("ar-EG", { maximumFractionDigits: 1 }), icon: Recycle, bg: "#a9713f" },
+    { label: "النقاط الممنوحة", value: stats.totalPointsIssued.toLocaleString("ar-EG"), icon: Coins, bg: "#8a5a38" },
+    { label: "المحلات (نشط / إجمالي)", value: `${stats.activeShops} / ${stats.shops}`, icon: Store, bg: "#5b7186" }
   ];
 
   return (
@@ -323,6 +323,9 @@ export default function AdminHome() {
         </Link>
         <Link to="/admin/ask-data" className="btn btn-outline">
           <Sparkles size={16} /> اسأل بياناتك
+        </Link>
+        <Link to="/admin/subscribers" className="btn btn-outline">
+          <Users size={16} /> مشتركين التجميع
         </Link>
       </div>
 
@@ -358,7 +361,11 @@ export default function AdminHome() {
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value, name) => [`${value} كجم`, name]} />
+                    <Tooltip
+                      formatter={(value, name) => [`${value} كجم`, name]}
+                      contentStyle={{ background: "#101b26", border: "1px solid rgba(206,139,95,.38)", borderRadius: 12, color: "#f3efe9" }}
+                      itemStyle={{ color: "#f3efe9" }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -420,11 +427,16 @@ export default function AdminHome() {
           <div dir="ltr" style={{ width: "100%", height: 260 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} width={45} />
-                <Tooltip formatter={(value, name) => (name === "kg" ? [`${value} كجم`, "الوزن"] : [value, name])} />
-                <Bar dataKey="kg" fill="#059669" radius={[6, 6, 0, 0]} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(157,176,193,.18)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9db0c1" }} />
+                <YAxis tick={{ fontSize: 11, fill: "#9db0c1" }} width={45} />
+                <Tooltip
+                  formatter={(value, name) => (name === "kg" ? [`${value} كجم`, "الوزن"] : [value, name])}
+                  contentStyle={{ background: "#101b26", border: "1px solid rgba(206,139,95,.38)", borderRadius: 12, color: "#f3efe9" }}
+                  itemStyle={{ color: "#f3efe9" }}
+                  cursor={{ fill: "rgba(206,139,95,.08)" }}
+                />
+                <Bar dataKey="kg" fill="#ce8b5f" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -479,12 +491,12 @@ export default function AdminHome() {
               return (
                 <article className="shop-item" key={shop.id}>
                   <img
-                    src={shop.photo_url || "/icons/icon-192.png"}
+                    src={shop.photo_url || (import.meta.env.BASE_URL + "icons/icon-192.png")}
                     alt={shop.store_name || shop.name || "محل"}
                     className="shop-photo"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
-                      e.currentTarget.src = "/icons/icon-192.png";
+                      e.currentTarget.src = (import.meta.env.BASE_URL + "icons/icon-192.png");
                     }}
                   />
                   <div>

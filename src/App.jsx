@@ -20,6 +20,7 @@ import ManageTransactions from "./pages/admin/ManageTransactions";
 import ManageSettlements from "./pages/admin/ManageSettlements";
 import ManageLeagues from "./pages/admin/ManageLeagues";
 import AskData from "./pages/admin/AskData";
+import ManageSubscribers from "./pages/admin/ManageSubscribers";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import { roles } from "./lib/supabase";
 
@@ -228,6 +229,14 @@ export default function App() {
           element={
             <ProtectedRoute allowedRoles={[roles.ADMIN]}>
               <AskData />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/subscribers"
+          element={
+            <ProtectedRoute allowedRoles={[roles.ADMIN]}>
+              <ManageSubscribers />
             </ProtectedRoute>
           }
         />

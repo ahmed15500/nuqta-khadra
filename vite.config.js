@@ -19,27 +19,27 @@ export default defineConfig({
         name: "EcoWasteAI",
         short_name: "EcoWasteAI",
         description: "منظومة إدارة إعادة التدوير بنظام النقاط",
-        theme_color: "#056136",
-        background_color: "#f6f9f4",
+        theme_color: "#0d151d",
+        background_color: "#0d151d",
         display: "standalone",
-        start_url: "/",
+        start_url: ".",
         lang: "ar",
         dir: "rtl",
         icons: [
           {
-            src: "/icons/icon-192.png",
+            src: "icons/icon-192.png",
             sizes: "192x192",
             type: "image/png",
             purpose: "any"
           },
           {
-            src: "/icons/icon-512.png",
+            src: "icons/icon-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "any"
           },
           {
-            src: "/icons/icon-maskable-512.png",
+            src: "icons/icon-maskable-512.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable"

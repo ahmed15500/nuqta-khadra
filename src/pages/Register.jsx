@@ -2,9 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
-const rdcLogoUrl = "https://hu.edu.eg/wp-content/uploads/2024/09/rural-development-center.webp";
-const appLogoUrl = "/icons/nuqta-logo.png";
-const rdcLogoFallback = "/icons/icon-192.png";
+const appLogoUrl = (import.meta.env.BASE_URL + "icons/nuqta-logo.png");
 
 export default function Register() {
   const { register } = useAuth();
@@ -40,22 +38,15 @@ export default function Register() {
         </div>
         <h1>إنشاء حساب مستخدم</h1>
 
-        <a className="powered-by auth-powered" href="https://hu.edu.eg/" target="_blank" rel="noreferrer">
-          <img
-            src={rdcLogoUrl}
-            alt="Rural Development Center - Heliopolis University"
-            className="powered-logo"
-            loading="lazy"
-            onError={(e) => {
-              if (e.currentTarget.src.endsWith(rdcLogoFallback)) return;
-              e.currentTarget.src = rdcLogoFallback;
-            }}
-          />
+        <div className="powered-by auth-powered">
+          <span className="powered-logo sadeem-mark" aria-hidden="true">
+            سديم
+          </span>
           <span className="powered-copy powered-copy-en" lang="en" dir="ltr">
             <small>Powered by</small>
-            <strong>Rural Development Center - Heliopolis University</strong>
+            <strong>SADEEM for Innovation and Sustainability Solutions</strong>
           </span>
-        </a>
+        </div>
 
         <label>
           الاسم

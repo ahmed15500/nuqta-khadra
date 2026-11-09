@@ -8,6 +8,7 @@ import {
   Settings2,
   Store,
   Trophy,
+  Users,
   WalletCards
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -30,6 +31,7 @@ const roleItems = {
     { key: "home", to: "/admin", label: "الرئيسية", icon: Home, end: true },
     { key: "prices", to: "/admin/prices", label: "الأسعار", icon: WalletCards },
     { key: "stores", to: "/admin/stores", label: "المحلات", icon: Store },
+    { key: "subscribers", to: "/admin/subscribers", label: "المشتركين", icon: Users },
     { key: "tx", to: "/admin/transactions", label: "المعاملات", icon: Settings2 },
     { key: "leagues", to: "/admin/leagues", label: "الدوريات", icon: Trophy },
     { key: "settlements", to: "/admin/settlements", label: "التسوية", icon: CircleDollarSign }
