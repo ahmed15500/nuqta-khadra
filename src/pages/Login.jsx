@@ -49,7 +49,7 @@ export default function Login() {
     <main className="login-page" dir="rtl" lang="ar">
       <style>{loginStyles}</style>
 
-      <section className="login-shell" aria-label="تسجيل الدخول إلى نقطة خضراء">
+      <section className="login-shell" aria-label="تسجيل الدخول إلى EcoWasteAI">
         <aside className="login-hero">
           <div className="login-hero-glow login-hero-glow-one" />
           <div className="login-hero-glow login-hero-glow-two" />
@@ -59,8 +59,8 @@ export default function Login() {
           </div>
 
           <div className="login-hero-copy">
-            <span className="login-eyebrow">NUQTA KHADRA</span>
-            <h1>نقطة خضراء</h1>
+            <span className="login-eyebrow">ECOWASTEAI</span>
+            <h1>EcoWasteAI</h1>
             <p>حوّل مخلفاتك إلى نقاط ومكافآت، وشارك في بناء مجتمع أنظف وأكثر استدامة.</p>
           </div>
 
@@ -86,8 +86,8 @@ export default function Login() {
               <img className="login-mobile-logo-image" src={appLogoUrl} alt="" />
             </div>
             <div>
-              <strong>نقطة خضراء</strong>
-              <small>Nuqta Khadra</small>
+              <strong>EcoWasteAI</strong>
+              <small>Waste to Value</small>
             </div>
           </div>
 

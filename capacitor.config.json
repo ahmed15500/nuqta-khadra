@@ -1,6 +1,6 @@
 {
   "appId": "com.nuqta.khadra",
-  "appName": "Nuqta Khadra",
+  "appName": "EcoWasteAI",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "plugins": {

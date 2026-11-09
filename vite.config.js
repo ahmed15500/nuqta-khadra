@@ -16,8 +16,8 @@ export default defineConfig({
         "icons/nuqta-logo.png"
       ],
       manifest: {
-        name: "Nuqta Khadra",
-        short_name: "نقطة خضراء",
+        name: "EcoWasteAI",
+        short_name: "EcoWasteAI",
         description: "منظومة إدارة إعادة التدوير بنظام النقاط",
         theme_color: "#056136",
         background_color: "#f6f9f4",

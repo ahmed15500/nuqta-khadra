@@ -44,7 +44,7 @@ async function fetchPublicUpdate(updateApi) {
   return {
     latestVersion: normalizeVersion(update.version),
     downloadUrl: update.apk_url,
-    notes: update.notes || "تحديث جديد لتطبيق نقطة خضراء",
+    notes: update.notes || "تحديث جديد لتطبيق EcoWasteAI",
     mandatory: Boolean(update.mandatory),
     source: "public"
   };
@@ -71,7 +71,7 @@ async function fetchGitHubUpdate(repo) {
   return {
     latestVersion,
     downloadUrl,
-    notes: release.body || "تحديث جديد لتطبيق نقطة خضراء",
+    notes: release.body || "تحديث جديد لتطبيق EcoWasteAI",
     mandatory: false,
     source: apkAsset ? "apk" : "release"
   };

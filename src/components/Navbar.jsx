@@ -53,7 +53,7 @@ export default function Navbar() {
     <header className={`navbar ${isUserRole ? "navbar-user" : ""}`}>
       <div className="brand">
         <img className="brand-logo" src={appLogoUrl} alt="" aria-hidden="true" />
-        <span>نقطة خضراء</span>
+        <span>EcoWasteAI</span>
       </div>
 
       {links.length ? (

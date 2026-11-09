@@ -34,8 +34,8 @@ export default function Register() {
         <div className="auth-app-brand">
           <img src={appLogoUrl} alt="" aria-hidden="true" />
           <span>
-            <strong>نقطة خضراء</strong>
-            <small>Nuqta Khadra</small>
+            <strong>EcoWasteAI</strong>
+            <small>Waste to Value</small>
           </span>
         </div>
         <h1>إنشاء حساب مستخدم</h1>

@@ -1,5 +1,6 @@
-# Nuqta Khadra
+# EcoWasteAI
 
+Merged app (2026-11-09): Nuqta Khadra waste-points system + EcoWaste, running on the restored Ecowaste Supabase project. Admin dashboard ported from the EcoRewards design onto live data; AI slots (camera waste classification + ask-your-data) are built and activate when a Gemini API key is added as an edge-function secret.
 React + Vite + Supabase app, ready for:
 - Cloud deployment on Cloudflare Pages
 - App-like install on mobile/desktop as a PWA
