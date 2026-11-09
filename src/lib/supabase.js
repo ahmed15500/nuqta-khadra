@@ -13,9 +13,21 @@ export const supabaseConfigError = hasSupabaseEnv
   ? ""
   : "متغيرات Supabase غير مضبوطة (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).";
 
+// Android browsers (notably Brave/WebView) can deadlock on the Web Locks API
+// that supabase-js uses to guard the auth token, producing
+// "Navigator LockManager lock ... timed out" errors that break sign-in and
+// profile loading. Use a passthrough lock: auth operations run immediately
+// without acquiring a cross-tab Web Lock.
+const passthroughLock = async (name, acquireTimeout, fn) => await fn();
+
 export const supabase = createClient(
   supabaseUrl || "https://invalid.supabase.co",
-  supabaseAnonKey || "invalid-anon-key"
+  supabaseAnonKey || "invalid-anon-key",
+  {
+    auth: {
+      lock: passthroughLock
+    }
+  }
 );
 
 export const createEphemeralSupabaseClient = () =>
@@ -23,7 +35,8 @@ export const createEphemeralSupabaseClient = () =>
     auth: {
       persistSession: false,
       autoRefreshToken: false,
-      detectSessionInUrl: false
+      detectSessionInUrl: false,
+      lock: passthroughLock
     }
   });
 
