@@ -1,27 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="512" height="512">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#0b3f32" />
-      <stop offset="100%" stop-color="#2c8a63" />
-    </linearGradient>
-    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(255,255,255,0.28)" />
-      <stop offset="70%" stop-color="rgba(255,255,255,0)" />
+    <linearGradient id="g" x1="47" y1="128" x2="208" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#00853E"/>
+      <stop offset="1" stop-color="#0099A8"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)" />
-  <rect width="512" height="250" rx="112" fill="url(#shine)" />
-  <circle cx="256" cy="256" r="160" fill="#d6ad60" />
-  <path
-    d="M138 298C173 197 250 196 281 256C250 333 191 345 138 298Z"
-    fill="#0f4d32"
-    transform="rotate(-34 256 256)"
-  />
-  <path
-    d="M191 311L310 212"
-    stroke="#ffffff"
-    stroke-width="20"
-    stroke-linecap="round"
-  />
-  <circle cx="242" cy="286" r="20" fill="#ffffff" />
+  <path fill="url(#g)" d="M53,122 L51,131 L51,151 L56,168 L65,183 L79,197 L88,203 L101,209 L119,213 L135,213 L150,210 L161,206 L176,197 L190,184 L196,176 L203,163 L208,144 L201,155 L191,163 L145,183 L125,188 L107,188 L87,182 L74,172 L76,171 L85,177 L101,181 L115,181 L133,176 L134,155 L129,138 L141,134 L147,128 L150,117 L147,116 L137,119 L133,122 L128,132 L126,131 L123,123 L118,119 L108,116 L105,117 L108,128 L114,134 L125,137 L127,139 L128,162 L123,174 L102,156 L83,145 L73,136 L65,120 L66,103 L59,110 Z M123,81 L137,87 L152,101 L172,113 L183,123 L188,131 L190,138 L190,155 L201,139 L204,123 L201,109 L194,97 L178,84 L162,78 L139,77 Z M47,110 L56,99 L65,94 L90,89 L120,74 L143,69 L161,70 L175,74 L189,82 L204,97 L192,76 L178,62 L166,54 L144,46 L117,45 L93,52 L76,63 L64,75 L57,85 L51,97 Z"/>
 </svg>
