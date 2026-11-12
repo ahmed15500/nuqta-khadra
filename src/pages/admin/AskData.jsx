@@ -184,7 +184,7 @@ export default function AskData() {
                 key={chip}
                 style={{
                   background: "var(--mint-100)",
-                  border: "1px solid rgba(206,139,95,.18)",
+                  border: "1px solid rgba(20,108,57,.18)",
                   borderRadius: 999,
                   padding: "6px 12px",
                   fontSize: 13,

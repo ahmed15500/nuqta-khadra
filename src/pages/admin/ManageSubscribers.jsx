@@ -70,6 +70,17 @@ export default function ManageSubscribers() {
   const [payForm, setPayForm] = useState(initialPayForm);
   const [payingId, setPayingId] = useState("");
 
+  const [editingId, setEditingId] = useState("");
+  const [editForm, setEditForm] = useState(initialForm);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
+
+  const [historyForId, setHistoryForId] = useState("");
+  const [editingSubId, setEditingSubId] = useState("");
+  const [subEditForm, setSubEditForm] = useState(initialPayForm);
+  const [savingSubId, setSavingSubId] = useState("");
+  const [deletingSubId, setDeletingSubId] = useState("");
+
   const load = async () => {
     setLoading(true);
     setError("");
@@ -259,6 +270,173 @@ export default function ManageSubscribers() {
     await load();
   };
 
+  const openEdit = (customer) => {
+    setMsg("");
+    setError("");
+    if (editingId === customer.id) {
+      setEditingId("");
+      return;
+    }
+    setEditingId(customer.id);
+    setEditForm({
+      fullName: customer.full_name || "",
+      phone: customer.phone || "",
+      village: customer.village || "",
+      address: customer.address || "",
+      notes: customer.notes || ""
+    });
+  };
+
+  const saveEdit = async (customer) => {
+    setMsg("");
+    setError("");
+
+    const fullName = editForm.fullName.trim();
+    const phone = editForm.phone.trim();
+
+    if (!fullName) return setError("اسم المشترك مطلوب.");
+    if (!phone) return setError("رقم هاتف المشترك مطلوب.");
+
+    setSavingEdit(true);
+
+    const { error: updateError } = await supabase
+      .from("eco_waste_customers")
+      .update({
+        full_name: fullName,
+        phone,
+        village: editForm.village.trim() || null,
+        address: editForm.address.trim() || null,
+        notes: editForm.notes.trim() || null
+      })
+      .eq("id", customer.id);
+
+    setSavingEdit(false);
+
+    if (updateError) {
+      setError(updateError.message || "تعذر تعديل بيانات المشترك.");
+      return;
+    }
+
+    setMsg(`تم تعديل بيانات المشترك ${fullName}.`);
+    setEditingId("");
+    await load();
+  };
+
+  const deleteCustomer = async (customer) => {
+    const subsCount = (subsByCustomer.get(customer.id) || []).length;
+    const confirmed = window.confirm(
+      `حذف المشترك "${customer.full_name || ""}"؟ هيتم حذف كل اشتراكاته المسجلة (${subsCount}) معاه، والحذف ده مش هيتراجع فيه.`
+    );
+    if (!confirmed) return;
+
+    setMsg("");
+    setError("");
+    setDeletingId(customer.id);
+
+    const { error: subsDeleteError } = await supabase
+      .from("eco_waste_subscriptions")
+      .delete()
+      .eq("customer_id", customer.id);
+
+    if (subsDeleteError) {
+      setDeletingId("");
+      setError(subsDeleteError.message || "تعذر حذف اشتراكات المشترك.");
+      return;
+    }
+
+    const { error: deleteError } = await supabase.from("eco_waste_customers").delete().eq("id", customer.id);
+
+    setDeletingId("");
+
+    if (deleteError) {
+      setError(deleteError.message || "تعذر حذف المشترك.");
+      return;
+    }
+
+    if (editingId === customer.id) setEditingId("");
+    if (historyForId === customer.id) setHistoryForId("");
+    if (payForId === customer.id) setPayForId("");
+
+    setMsg(`تم حذف المشترك ${customer.full_name || ""} وكل اشتراكاته.`);
+    await load();
+  };
+
+  const toggleHistory = (customerId) => {
+    setMsg("");
+    setError("");
+    setEditingSubId("");
+    setHistoryForId((prev) => (prev === customerId ? "" : customerId));
+  };
+
+  const openSubEdit = (sub) => {
+    setMsg("");
+    setError("");
+    setEditingSubId(sub.id);
+    setSubEditForm({
+      year: String(sub.subscription_year || CURRENT_YEAR),
+      month: String(sub.subscription_month || CURRENT_MONTH),
+      paidOn: sub.paid_on || todayIso()
+    });
+  };
+
+  const saveSubEdit = async (sub) => {
+    setMsg("");
+    setError("");
+
+    const year = Number(subEditForm.year);
+    const month = Number(subEditForm.month);
+
+    if (!Number.isInteger(year) || year < 2000 || year > 2100) return setError("سنة الاشتراك غير صحيحة.");
+    if (!Number.isInteger(month) || month < 1 || month > 12) return setError("شهر الاشتراك غير صحيح.");
+    if (!subEditForm.paidOn) return setError("تاريخ الدفع مطلوب.");
+
+    setSavingSubId(sub.id);
+
+    const { error: updateError } = await supabase
+      .from("eco_waste_subscriptions")
+      .update({
+        subscription_year: year,
+        subscription_month: month,
+        paid_on: subEditForm.paidOn
+      })
+      .eq("id", sub.id);
+
+    setSavingSubId("");
+
+    if (updateError) {
+      setError(updateError.message || "تعذر تعديل الدفعة.");
+      return;
+    }
+
+    setMsg(`تم تعديل الدفعة إلى ${monthLabel(year, month)}.`);
+    setEditingSubId("");
+    await load();
+  };
+
+  const deleteSub = async (sub) => {
+    const confirmed = window.confirm(
+      `حذف دفعة اشتراك ${monthLabel(sub.subscription_year, sub.subscription_month)}؟ الحذف ده مش هيتراجع فيه.`
+    );
+    if (!confirmed) return;
+
+    setMsg("");
+    setError("");
+    setDeletingSubId(sub.id);
+
+    const { error: deleteError } = await supabase.from("eco_waste_subscriptions").delete().eq("id", sub.id);
+
+    setDeletingSubId("");
+
+    if (deleteError) {
+      setError(deleteError.message || "تعذر حذف الدفعة.");
+      return;
+    }
+
+    if (editingSubId === sub.id) setEditingSubId("");
+    setMsg(`تم حذف دفعة اشتراك ${monthLabel(sub.subscription_year, sub.subscription_month)}.`);
+    await load();
+  };
+
   return (
     <section className="page">
       <h1>مشتركين التجميع</h1>
@@ -404,6 +582,26 @@ export default function ManageSubscribers() {
                     >
                       تسجيل دفع
                     </button>
+                    <button
+                      className="btn btn-outline btn-small"
+                      onClick={() => openEdit(customer)}
+                      disabled={deletingId === customer.id}
+                    >
+                      تعديل
+                    </button>
+                    <button
+                      className="btn btn-outline btn-small"
+                      onClick={() => toggleHistory(customer.id)}
+                    >
+                      الاشتراكات ({(subsByCustomer.get(customer.id) || []).length.toLocaleString("ar-EG")})
+                    </button>
+                    <button
+                      className="btn btn-outline btn-small"
+                      onClick={() => deleteCustomer(customer)}
+                      disabled={deletingId === customer.id}
+                    >
+                      {deletingId === customer.id ? "جاري الحذف..." : "حذف"}
+                    </button>
                   </td>
                 </tr>,
                 payForId === customer.id ? (
@@ -457,6 +655,191 @@ export default function ManageSubscribers() {
                           إلغاء
                         </button>
                       </div>
+                    </td>
+                  </tr>
+                ) : null,
+                editingId === customer.id ? (
+                  <tr key={`${customer.id}-edit`}>
+                    <td colSpan={6}>
+                      <h4 style={{ marginTop: 0 }}>تعديل بيانات المشترك</h4>
+                      <div className="grid-2">
+                        <label>
+                          الاسم بالكامل
+                          <input
+                            value={editForm.fullName}
+                            onChange={(e) => setEditForm((p) => ({ ...p, fullName: e.target.value }))}
+                            disabled={savingEdit}
+                          />
+                        </label>
+                        <label>
+                          رقم الهاتف
+                          <input
+                            value={editForm.phone}
+                            onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                            disabled={savingEdit}
+                          />
+                        </label>
+                        <label>
+                          القرية
+                          <input
+                            list="subscriber-villages"
+                            value={editForm.village}
+                            onChange={(e) => setEditForm((p) => ({ ...p, village: e.target.value }))}
+                            placeholder="اختر قرية موجودة أو اكتب قرية جديدة"
+                            disabled={savingEdit}
+                          />
+                        </label>
+                        <label>
+                          العنوان (اختياري)
+                          <input
+                            value={editForm.address}
+                            onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
+                            disabled={savingEdit}
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        ملحوظات (اختياري)
+                        <textarea
+                          value={editForm.notes}
+                          onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))}
+                          rows={2}
+                          disabled={savingEdit}
+                        />
+                      </label>
+                      <div className="split">
+                        <button className="btn btn-small" onClick={() => saveEdit(customer)} disabled={savingEdit}>
+                          {savingEdit ? "جاري الحفظ..." : "حفظ التعديلات"}
+                        </button>
+                        <button
+                          className="btn btn-outline btn-small"
+                          onClick={() => setEditingId("")}
+                          disabled={savingEdit}
+                        >
+                          إلغاء
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : null,
+                historyForId === customer.id ? (
+                  <tr key={`${customer.id}-history`}>
+                    <td colSpan={6}>
+                      <h4 style={{ marginTop: 0 }}>سجل اشتراكات {customer.full_name || ""}</h4>
+                      {(subsByCustomer.get(customer.id) || []).length ? (
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {(subsByCustomer.get(customer.id) || []).map((sub) =>
+                            editingSubId === sub.id ? (
+                              <div
+                                key={sub.id}
+                                style={{
+                                  border: "1px solid rgba(20,108,57,.25)",
+                                  borderRadius: 14,
+                                  padding: 12
+                                }}
+                              >
+                                <div className="grid-3" style={{ alignItems: "end" }}>
+                                  <label>
+                                    السنة
+                                    <input
+                                      type="number"
+                                      min="2000"
+                                      max="2100"
+                                      value={subEditForm.year}
+                                      onChange={(e) =>
+                                        setSubEditForm((p) => ({ ...p, year: e.target.value }))
+                                      }
+                                      disabled={savingSubId === sub.id}
+                                    />
+                                  </label>
+                                  <label>
+                                    الشهر
+                                    <select
+                                      value={subEditForm.month}
+                                      onChange={(e) =>
+                                        setSubEditForm((p) => ({ ...p, month: e.target.value }))
+                                      }
+                                      disabled={savingSubId === sub.id}
+                                    >
+                                      {MONTH_NAMES.map((name, idx) => (
+                                        <option key={name} value={idx + 1}>
+                                          {name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                  <label>
+                                    تاريخ الدفع
+                                    <input
+                                      type="date"
+                                      value={subEditForm.paidOn}
+                                      onChange={(e) =>
+                                        setSubEditForm((p) => ({ ...p, paidOn: e.target.value }))
+                                      }
+                                      disabled={savingSubId === sub.id}
+                                    />
+                                  </label>
+                                </div>
+                                <div className="split">
+                                  <button
+                                    className="btn btn-small"
+                                    onClick={() => saveSubEdit(sub)}
+                                    disabled={savingSubId === sub.id}
+                                  >
+                                    {savingSubId === sub.id ? "جاري الحفظ..." : "حفظ الدفعة"}
+                                  </button>
+                                  <button
+                                    className="btn btn-outline btn-small"
+                                    onClick={() => setEditingSubId("")}
+                                    disabled={savingSubId === sub.id}
+                                  >
+                                    إلغاء
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                key={sub.id}
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  gap: 10,
+                                  flexWrap: "wrap",
+                                  border: "1px solid rgba(20,108,57,.16)",
+                                  borderRadius: 14,
+                                  padding: "10px 12px"
+                                }}
+                              >
+                                <span>
+                                  <strong>{monthLabel(sub.subscription_year, sub.subscription_month)}</strong>
+                                  <span className="muted"> — دفع بتاريخ {formatDate(sub.paid_on)}</span>
+                                </span>
+                                <span className="actions-cell">
+                                  <button
+                                    className="btn btn-outline btn-small"
+                                    onClick={() => openSubEdit(sub)}
+                                    disabled={deletingSubId === sub.id}
+                                  >
+                                    تعديل
+                                  </button>
+                                  <button
+                                    className="btn btn-outline btn-small"
+                                    onClick={() => deleteSub(sub)}
+                                    disabled={deletingSubId === sub.id}
+                                  >
+                                    {deletingSubId === sub.id ? "جاري الحذف..." : "حذف"}
+                                  </button>
+                                </span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      ) : (
+                        <p className="muted" style={{ margin: 0 }}>
+                          لا توجد اشتراكات مسجلة لهذا المشترك.
+                        </p>
+                      )}
                     </td>
                   </tr>
                 ) : null

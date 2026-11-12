@@ -8,6 +8,7 @@ import {
   Settings2,
   Store,
   Trophy,
+  UserPlus,
   Users,
   WalletCards
 } from "lucide-react";
@@ -32,6 +33,7 @@ const roleItems = {
     { key: "prices", to: "/admin/prices", label: "الأسعار", icon: WalletCards },
     { key: "stores", to: "/admin/stores", label: "المحلات", icon: Store },
     { key: "subscribers", to: "/admin/subscribers", label: "المشتركين", icon: Users },
+    { key: "users", to: "/admin/users", label: "المستخدمين", icon: UserPlus },
     { key: "tx", to: "/admin/transactions", label: "المعاملات", icon: Settings2 },
     { key: "leagues", to: "/admin/leagues", label: "الدوريات", icon: Trophy },
     { key: "settlements", to: "/admin/settlements", label: "التسوية", icon: CircleDollarSign }
